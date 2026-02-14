@@ -1,0 +1,29 @@
+<!-- IF S_ADMINHELPER_INJECT_EMAIL -->
+<script>
+(function() {
+    // Target the "select_user" form (ACP Manage Users page)
+    var form = document.getElementById('select_user');
+    if (!form) return;
+
+    var usernameDl = form.querySelector('dl');
+    if (!usernameDl) return;
+
+    // Create the email search field
+    var emailDl = document.createElement('dl');
+    emailDl.innerHTML = '<dt><label for="email_search" style="font-weight:bold">Ou rechercher par adresse email :</label></dt>'
+        + '<dd><input class="text medium" type="email" id="email_search" name="email_search" '
+        + 'placeholder="ex: utilisateur@example.com" value="<!-- IF ADMINHELPER_EMAIL_VALUE -->{ADMINHELPER_EMAIL_VALUE}<!-- ENDIF -->" '
+        + 'style="margin-top:4px" /></dd>';
+
+    // Insert after the username dl
+    usernameDl.parentNode.insertBefore(emailDl, usernameDl.nextSibling);
+
+    <!-- IF S_EMAIL_NOT_FOUND -->
+    // Show error message
+    var errorDl = document.createElement('dl');
+    errorDl.innerHTML = '<dd><p style="color:#bc2a4d;font-weight:bold;margin:4px 0">Aucun utilisateur trouvé avec l\'adresse : {EMAIL_SEARCHED}</p></dd>';
+    emailDl.parentNode.insertBefore(errorDl, emailDl.nextSibling);
+    <!-- ENDIF -->
+})();
+</script>
+<!-- ENDIF -->

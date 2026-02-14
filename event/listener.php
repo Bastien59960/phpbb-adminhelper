@@ -25,17 +25,9 @@ class listener implements EventSubscriberInterface
     public static function getSubscribedEvents()
     {
         return [
-            'core.common'           => 'handle_email_search',
-            'core.adm_page_header'  => 'load_language',
+            'core.common'                => 'handle_email_search',
+            'core.adm_page_header_after' => 'inject_email_field',
         ];
-    }
-
-    /**
-     * Load language file for ACP template events.
-     */
-    public function load_language()
-    {
-        $this->language->add_lang('info_acp_adminhelper', 'bastien59960/adminhelper');
     }
 
     /**
@@ -51,8 +43,6 @@ class listener implements EventSubscriberInterface
             return;
         }
 
-        $this->language->add_lang('info_acp_adminhelper', 'bastien59960/adminhelper');
-
         $sql = 'SELECT user_id FROM ' . USERS_TABLE . "
                 WHERE user_email = '" . $this->db->sql_escape($email) . "'";
         $result = $this->db->sql_query($sql);
@@ -61,16 +51,29 @@ class listener implements EventSubscriberInterface
 
         if ($user_id)
         {
-            // Inject user_id into the request so acp_users.php finds it
             $this->request->overwrite('u', $user_id, \phpbb\request\request_interface::REQUEST);
         }
         else
         {
-            // Email not found — set template variable for error display
             $this->template->assign_vars([
                 'S_EMAIL_NOT_FOUND' => true,
                 'EMAIL_SEARCHED'    => $email,
             ]);
+        }
+    }
+
+    /**
+     * Inject email search field into the ACP "Manage Users" form via JavaScript.
+     * The S_SELECT_USER block has no template event, so we inject via JS.
+     */
+    public function inject_email_field()
+    {
+        $this->template->assign_var('S_ADMINHELPER_INJECT_EMAIL', true);
+
+        $email_searched = $this->request->variable('email_search', '', true);
+        if ($email_searched)
+        {
+            $this->template->assign_var('ADMINHELPER_EMAIL_VALUE', $email_searched);
         }
     }
 }
