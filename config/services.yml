@@ -1,0 +1,10 @@
+services:
+    bastien59960.adminhelper.listener:
+        class: bastien59960\adminhelper\event\listener
+        arguments:
+            - '@dbal.conn'
+            - '@request'
+            - '@template'
+            - '@language'
+        tags:
+            - { name: event.listener }
