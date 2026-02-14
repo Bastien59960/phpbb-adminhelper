@@ -29,7 +29,7 @@ ext/
         ├── event/
         │   └── listener.php
         ├── adm/style/event/
-        │   └── acp_users_select_group_before.html
+        │   └── acp_overall_footer_after.html
         └── language/
             ├── en/
             │   └── info_acp_adminhelper.php
@@ -46,8 +46,10 @@ ext/
 
 L'extension utilise deux mécanismes phpBB :
 
-1. **Template event** `acp_users_select_group_before` : injecte le champ email dans le formulaire de sélection d'utilisateur de l'ACP
-2. **Event listener** `core.common` : intercepte le POST du champ email, effectue la recherche en base de données, et injecte le `user_id` trouvé via `request::overwrite()` avant que le module ACP ne traite la requête
+1. **Template event** `acp_overall_footer_after` : injecte un script JavaScript qui ajoute le champ email dans le formulaire de sélection d'utilisateur de l'ACP (le bloc `S_SELECT_USER` n'a pas de template event dédié)
+2. **Event listeners** :
+   - `core.common` : intercepte le POST du champ email, effectue la recherche en base de données, et injecte le `user_id` trouvé via `request::overwrite()` avant que le module ACP ne traite la requête
+   - `core.adm_page_header_after` : active l'injection du JavaScript dans le footer ACP
 
 Aucune modification de la base de données n'est nécessaire — l'extension utilise la colonne `user_email` existante de la table `phpbb_users`.
 
