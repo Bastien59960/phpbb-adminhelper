@@ -22,7 +22,7 @@ Dans `ACP > General > Client communication > Email`:
 
 ### 3) Desinscription distincte par type
 
-Le token de desinscription prend en charge deux types:
+Le token de desinscription prend en charge deux types :
 
 - `massmail`: desinscription des emails de masse administrateur
 - `forum_notify`: desinscription des notifications email forum

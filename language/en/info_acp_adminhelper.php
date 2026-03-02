@@ -23,7 +23,7 @@ $lang = array_merge($lang, [
     'ADMINHELPER_ENABLE_ONE_CLICK_EXPLAIN' => 'Adds List-Unsubscribe and List-Unsubscribe-Post headers and sends one recipient per email for compliant one-click unsubscribe.',
     'ADMINHELPER_UNSUBSCRIBE_TEXT' => 'To stop receiving administrator bulk emails, log in and disable the corresponding option in your profile preferences: %s',
     'ADMINHELPER_UNSUBSCRIBE_HTML' => '<hr><p><strong>Unsubscribe:</strong> To stop receiving administrator bulk emails, log in and disable the corresponding option in your profile preferences: <a href="%1$s">%1$s</a></p>',
-    'ADMINHELPER_NOTIFY_UNSUBSCRIBE_TEXT' => 'To stop receiving forum notification emails, use one-click unsubscribe: %1$s\nOr log in and disable notification email options here: %2$s',
+    'ADMINHELPER_NOTIFY_UNSUBSCRIBE_TEXT' => 'To stop receiving forum notification emails, use one-click unsubscribe: %1$s' . "\n" . 'Or log in and disable notification email options here: %2$s',
     'ADMINHELPER_UNSUB_INVALID_REQUEST' => 'Invalid unsubscribe request.',
     'ADMINHELPER_UNSUB_USER_NOT_FOUND' => 'User not found.',
     'ADMINHELPER_UNSUB_INVALID_SIGNATURE' => 'Invalid unsubscribe signature.',

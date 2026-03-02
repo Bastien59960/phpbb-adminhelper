@@ -23,7 +23,7 @@ $lang = array_merge($lang, [
     'ADMINHELPER_ENABLE_ONE_CLICK_EXPLAIN' => 'Fuegt List-Unsubscribe- und List-Unsubscribe-Post-Header hinzu und sendet eine Nachricht pro Empfaenger fuer RFC8058-konforme One-Click-Abmeldung.',
     'ADMINHELPER_UNSUBSCRIBE_TEXT' => 'Um keine Admin-Rundmails mehr zu erhalten, melden Sie sich an und deaktivieren Sie die entsprechende Option in Ihren Profil-Einstellungen: %s',
     'ADMINHELPER_UNSUBSCRIBE_HTML' => '<hr><p><strong>Abmeldung:</strong> Um keine Admin-Rundmails mehr zu erhalten, melden Sie sich an und deaktivieren Sie die entsprechende Option in Ihren Profil-Einstellungen: <a href="%1$s">%1$s</a></p>',
-    'ADMINHELPER_NOTIFY_UNSUBSCRIBE_TEXT' => 'Um keine Forum-Benachrichtigungs-E-Mails mehr zu erhalten, nutzen Sie die One-Click-Abmeldung: %1$s\nOder melden Sie sich an und deaktivieren Sie E-Mail-Benachrichtigungen hier: %2$s',
+    'ADMINHELPER_NOTIFY_UNSUBSCRIBE_TEXT' => 'Um keine Forum-Benachrichtigungs-E-Mails mehr zu erhalten, nutzen Sie die One-Click-Abmeldung: %1$s' . "\n" . 'Oder melden Sie sich an und deaktivieren Sie E-Mail-Benachrichtigungen hier: %2$s',
     'ADMINHELPER_UNSUB_INVALID_REQUEST' => 'Ungueltige Abmeldeanfrage.',
     'ADMINHELPER_UNSUB_USER_NOT_FOUND' => 'Benutzer nicht gefunden.',
     'ADMINHELPER_UNSUB_INVALID_SIGNATURE' => 'Ungueltige Abmeldesignatur.',

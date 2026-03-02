@@ -23,7 +23,7 @@ $lang = array_merge($lang, [
     'ADMINHELPER_ENABLE_ONE_CLICK_EXPLAIN' => 'Ajoute les en-tetes List-Unsubscribe et List-Unsubscribe-Post et envoie un destinataire par email pour une desinscription one-click conforme.',
     'ADMINHELPER_UNSUBSCRIBE_TEXT' => 'Pour ne plus recevoir les emails d\'information des administrateurs, connectez-vous puis desactivez l\'option correspondante dans les preferences de votre profil : %s',
     'ADMINHELPER_UNSUBSCRIBE_HTML' => '<hr><p><strong>Desinscription :</strong> Pour ne plus recevoir les emails d\'information des administrateurs, connectez-vous puis desactivez l\'option correspondante dans les preferences de votre profil : <a href="%1$s">%1$s</a></p>',
-    'ADMINHELPER_NOTIFY_UNSUBSCRIBE_TEXT' => 'Pour ne plus recevoir les emails de notification du forum, utilisez la desinscription one-click : %1$s\nOu connectez-vous et desactivez les notifications email ici : %2$s',
+    'ADMINHELPER_NOTIFY_UNSUBSCRIBE_TEXT' => 'Pour ne plus recevoir les emails de notification du forum, utilisez la desinscription one-click : %1$s' . "\n" . 'et pour gérer plus finement vos notifications c\'est ici  : %2$s',
     'ADMINHELPER_UNSUB_INVALID_REQUEST' => 'Requete de desinscription invalide.',
     'ADMINHELPER_UNSUB_USER_NOT_FOUND' => 'Membre introuvable.',
     'ADMINHELPER_UNSUB_INVALID_SIGNATURE' => 'Signature de desinscription invalide.',

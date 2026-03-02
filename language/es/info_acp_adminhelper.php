@@ -23,7 +23,7 @@ $lang = array_merge($lang, [
     'ADMINHELPER_ENABLE_ONE_CLICK_EXPLAIN' => 'Anade cabeceras List-Unsubscribe y List-Unsubscribe-Post y envia un destinatario por correo para una baja one-click compatible con RFC8058.',
     'ADMINHELPER_UNSUBSCRIBE_TEXT' => 'Para dejar de recibir correos masivos del administrador, inicia sesion y desactiva la opcion correspondiente en las preferencias de tu perfil: %s',
     'ADMINHELPER_UNSUBSCRIBE_HTML' => '<hr><p><strong>Baja:</strong> Para dejar de recibir correos masivos del administrador, inicia sesion y desactiva la opcion correspondiente en las preferencias de tu perfil: <a href="%1$s">%1$s</a></p>',
-    'ADMINHELPER_NOTIFY_UNSUBSCRIBE_TEXT' => 'Para dejar de recibir emails de notificaciones del foro, usa la baja one-click: %1$s\nO inicia sesion y desactiva las notificaciones por email aqui: %2$s',
+    'ADMINHELPER_NOTIFY_UNSUBSCRIBE_TEXT' => 'Para dejar de recibir emails de notificaciones del foro, usa la baja one-click: %1$s' . "\n" . 'O inicia sesion y desactiva las notificaciones por email aqui: %2$s',
     'ADMINHELPER_UNSUB_INVALID_REQUEST' => 'Solicitud de baja invalida.',
     'ADMINHELPER_UNSUB_USER_NOT_FOUND' => 'Usuario no encontrado.',
     'ADMINHELPER_UNSUB_INVALID_SIGNATURE' => 'Firma de baja invalida.',

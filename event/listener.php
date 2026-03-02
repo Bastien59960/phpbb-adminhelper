@@ -73,7 +73,7 @@ class listener implements EventSubscriberInterface
         $this->handle_unsubscribe_request();
         $this->prepare_mass_email_message_fallback();
 
-        if (!defined('IN_ADMIN') || $this->request->variable('i', '') !== 'acp_users')
+        if (!defined('IN_ADMIN'))
         {
             return;
         }
@@ -84,17 +84,13 @@ class listener implements EventSubscriberInterface
             return;
         }
 
-        $email = $this->request->variable('email_search', '', true);
-        if (!$email)
+        $email = trim((string) $this->request->variable('email_search', '', true));
+        if ($email === '')
         {
             return;
         }
 
-        $sql = 'SELECT user_id FROM ' . USERS_TABLE . "
-                WHERE user_email = '" . $this->db->sql_escape($email) . "'";
-        $result = $this->db->sql_query($sql);
-        $user_id = (int) $this->db->sql_fetchfield('user_id');
-        $this->db->sql_freeresult($result);
+        $user_id = $this->find_user_id_by_email($email);
 
         if ($user_id)
         {
@@ -762,7 +758,7 @@ class listener implements EventSubscriberInterface
 
         $user_id = (int) $this->request->variable('u', 0);
         $expires_at = (int) $this->request->variable('exp', 0);
-        $signature = (string) $this->request->variable('sig', '', true);
+        $signature = $this->normalize_unsubscribe_signature((string) $this->request->variable('sig', '', true));
         $unsubscribe_type = $this->normalize_unsubscribe_type((string) $this->request->variable('t', 'massmail', true));
         $log_context = [
             'user_id' => $user_id,
@@ -947,6 +943,22 @@ class listener implements EventSubscriberInterface
         return $unsubscribe_type === 'forum_notify' ? 'forum_notify' : 'massmail';
     }
 
+    private function normalize_unsubscribe_signature($signature)
+    {
+        $signature = strtolower(trim((string) $signature));
+        if ($signature === '')
+        {
+            return '';
+        }
+
+        if (preg_match('/^([a-f0-9]{64})/i', $signature, $matches))
+        {
+            return strtolower($matches[1]);
+        }
+
+        return $signature;
+    }
+
     private function is_forum_notification_email_message($message)
     {
         $message = (string) $message;
@@ -1007,6 +1019,40 @@ class listener implements EventSubscriberInterface
         }
 
         return false;
+    }
+
+    private function find_user_id_by_email($email)
+    {
+        $email = utf8_strtolower(trim((string) $email));
+        if ($email === '')
+        {
+            return 0;
+        }
+
+        $email_hash = (string) phpbb_email_hash($email);
+        $sql = 'SELECT user_id
+            FROM ' . USERS_TABLE . "
+            WHERE user_email_hash = '" . $this->db->sql_escape($email_hash) . "'
+            ORDER BY user_id ASC";
+        $result = $this->db->sql_query_limit($sql, 1);
+        $user_id = (int) $this->db->sql_fetchfield('user_id');
+        $this->db->sql_freeresult($result);
+
+        if ($user_id > 0)
+        {
+            return $user_id;
+        }
+
+        // Compatibility fallback for legacy rows without user_email_hash.
+        $sql = 'SELECT user_id
+            FROM ' . USERS_TABLE . "
+            WHERE user_email = '" . $this->db->sql_escape($email) . "'
+            ORDER BY user_id ASC";
+        $result = $this->db->sql_query_limit($sql, 1);
+        $user_id = (int) $this->db->sql_fetchfield('user_id');
+        $this->db->sql_freeresult($result);
+
+        return $user_id;
     }
 
     private function find_user_for_recipient($email, $name)
@@ -1081,23 +1127,58 @@ class listener implements EventSubscriberInterface
 
     private function is_user_notification_email_subscribed(array $user_row)
     {
+        $user_id = (int) ($user_row['user_id'] ?? 0);
+        if ($user_id <= 0)
+        {
+            return false;
+        }
+
         $legacy_email_enabled = (int) ($user_row['user_notify'] ?? 0) === 1
             && in_array((int) ($user_row['user_notify_type'] ?? NOTIFY_EMAIL), [NOTIFY_EMAIL, NOTIFY_BOTH], true);
+        if ($legacy_email_enabled)
+        {
+            return true;
+        }
 
         $sql = 'SELECT 1 AS is_enabled
             FROM ' . USER_NOTIFICATIONS_TABLE . "
-            WHERE user_id = " . (int) $user_row['user_id'] . "
+            WHERE user_id = " . $user_id . "
+                AND item_id = 0
                 AND method = 'notification.method.email'
                 AND notify = 1";
         $result = $this->db->sql_query_limit($sql, 1);
         $has_email_method_enabled = (bool) $this->db->sql_fetchfield('is_enabled');
         $this->db->sql_freeresult($result);
+        if ($has_email_method_enabled)
+        {
+            return true;
+        }
 
-        return $legacy_email_enabled || $has_email_method_enabled;
+        // Missing per-type rows fallback to phpBB default methods (email usually enabled).
+        $sql = 'SELECT 1 AS has_missing_preference
+            FROM ' . NOTIFICATION_TYPES_TABLE . ' nt
+            LEFT JOIN ' . USER_NOTIFICATIONS_TABLE . " un
+                ON un.user_id = " . $user_id . "
+                    AND un.item_type = nt.notification_type_name
+                    AND un.item_id = 0
+                    AND un.method = 'notification.method.email'
+            WHERE nt.notification_type_enabled = 1
+                AND un.user_id IS NULL";
+        $result = $this->db->sql_query_limit($sql, 1);
+        $has_missing_preference = (bool) $this->db->sql_fetchfield('has_missing_preference');
+        $this->db->sql_freeresult($result);
+
+        return $has_missing_preference;
     }
 
     private function disable_user_notification_email($user_id)
     {
+        $user_id = (int) $user_id;
+        if ($user_id <= 0)
+        {
+            return;
+        }
+
         $sql = 'UPDATE ' . USERS_TABLE . '
             SET user_notify = 0,
                 user_notify_type = CASE
@@ -1105,14 +1186,54 @@ class listener implements EventSubscriberInterface
                     WHEN user_notify_type = ' . NOTIFY_BOTH . ' THEN ' . NOTIFY_IM . '
                     ELSE user_notify_type
                 END
-            WHERE user_id = ' . (int) $user_id;
+            WHERE user_id = ' . $user_id;
         $this->db->sql_query($sql);
+
+        $this->ensure_global_email_notification_rows($user_id);
 
         $sql = 'UPDATE ' . USER_NOTIFICATIONS_TABLE . "
             SET notify = 0
-            WHERE user_id = " . (int) $user_id . "
+            WHERE user_id = " . $user_id . "
                 AND method = 'notification.method.email'";
         $this->db->sql_query($sql);
+    }
+
+    private function ensure_global_email_notification_rows($user_id)
+    {
+        $user_id = (int) $user_id;
+        if ($user_id <= 0)
+        {
+            return;
+        }
+
+        $missing_rows = [];
+
+        $sql = 'SELECT nt.notification_type_name
+            FROM ' . NOTIFICATION_TYPES_TABLE . ' nt
+            LEFT JOIN ' . USER_NOTIFICATIONS_TABLE . " un
+                ON un.user_id = " . $user_id . "
+                    AND un.item_type = nt.notification_type_name
+                    AND un.item_id = 0
+                    AND un.method = 'notification.method.email'
+            WHERE nt.notification_type_enabled = 1
+                AND un.user_id IS NULL";
+        $result = $this->db->sql_query($sql);
+        while ($row = $this->db->sql_fetchrow($result))
+        {
+            $missing_rows[] = [
+                'item_type' => (string) $row['notification_type_name'],
+                'item_id' => 0,
+                'user_id' => $user_id,
+                'method' => 'notification.method.email',
+                'notify' => 0,
+            ];
+        }
+        $this->db->sql_freeresult($result);
+
+        if (!empty($missing_rows))
+        {
+            $this->db->sql_multi_insert(USER_NOTIFICATIONS_TABLE, $missing_rows);
+        }
     }
 
     private function log_unsubscribe_event($status, $http_status, array $context = [])
