@@ -306,18 +306,9 @@ class listener implements EventSubscriberInterface
         }
 
         $message = (string) $event['message'];
-        $this->notification_email_context = !$this->mass_email_context
-            && $this->is_forum_notification_email_message($message);
-
-        if ($this->notification_email_context)
-        {
-            $message_without_list_header = preg_replace('/^List-Unsubscribe:\s*.+\R?/mi', '', $message);
-            if ($message_without_list_header !== null)
-            {
-                $message = ltrim($message_without_list_header, "\r\n");
-                $event['message'] = $message;
-            }
-        }
+        // Safety rule: keep automatic forum notifications untouched.
+        // AdminHelper one-click headers now apply only to ACP mass emails.
+        $this->notification_email_context = false;
 
         if (!$this->mass_email_html_enabled || $this->mass_email_html_body === '')
         {
@@ -352,7 +343,7 @@ class listener implements EventSubscriberInterface
         $this->current_unsubscribe_one_click_url = '';
         $this->current_unsubscribe_type = '';
 
-        if ((!$this->mass_email_context || !$this->mass_email_one_click_enabled) && !$this->notification_email_context)
+        if (!$this->mass_email_context || !$this->mass_email_one_click_enabled)
         {
             return;
         }
@@ -370,40 +361,11 @@ class listener implements EventSubscriberInterface
             return;
         }
 
-        if ($this->mass_email_context && $this->mass_email_one_click_enabled)
-        {
-            $this->current_unsubscribe_type = 'massmail';
-            $this->current_unsubscribe_one_click_url = $this->build_one_click_unsubscribe_url(
-                (int) $user_row['user_id'],
-                (string) $user_row['user_email'],
-                $this->current_unsubscribe_type
-            );
-            return;
-        }
-
-        if (!$this->notification_email_context)
-        {
-            return;
-        }
-
-        $this->load_language();
-        $this->current_unsubscribe_type = 'forum_notify';
+        $this->current_unsubscribe_type = 'massmail';
         $this->current_unsubscribe_one_click_url = $this->build_one_click_unsubscribe_url(
             (int) $user_row['user_id'],
             (string) $user_row['user_email'],
             $this->current_unsubscribe_type
-        );
-
-        $current_message = (string) $event['msg'];
-        $unsubscribe_footer = $this->language->lang(
-            'ADMINHELPER_NOTIFY_UNSUBSCRIBE_TEXT',
-            $this->current_unsubscribe_one_click_url,
-            $this->build_notification_preferences_url()
-        );
-        $event['msg'] = $this->append_text_footer(
-            $current_message,
-            $unsubscribe_footer,
-            $this->current_unsubscribe_one_click_url
         );
     }
 
