@@ -78,12 +78,6 @@ class listener implements EventSubscriberInterface
             return;
         }
 
-        global $auth;
-        if (!isset($auth) || !$auth->acl_get('a_user'))
-        {
-            return;
-        }
-
         $email = trim((string) $this->request->variable('email_search', '', true));
         if ($email === '')
         {
