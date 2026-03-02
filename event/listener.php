@@ -73,7 +73,7 @@ class listener implements EventSubscriberInterface
         $this->handle_unsubscribe_request();
         $this->prepare_mass_email_message_fallback();
 
-        if (!defined('IN_ADMIN'))
+        if ($this->request->variable('i', '') !== 'acp_users')
         {
             return;
         }
@@ -85,26 +85,15 @@ class listener implements EventSubscriberInterface
         }
 
         $user_id = $this->find_user_id_by_email($email);
-        $is_acp_user_submit = $this->request->variable('i', '') === 'acp_users' && $this->request->is_set_post('submituser');
 
         if ($user_id)
         {
             $this->request->overwrite('u', $user_id, \phpbb\request\request_interface::REQUEST);
             $this->request->overwrite('u', $user_id, \phpbb\request\request_interface::POST);
             $this->request->overwrite('u', $user_id, \phpbb\request\request_interface::GET);
-
-            if ($is_acp_user_submit)
-            {
-                error_log('[AdminHelper][ACP_EMAIL_SEARCH] found user_id=' . (int) $user_id . ' for email=' . $email);
-            }
         }
         else
         {
-            if ($is_acp_user_submit)
-            {
-                error_log('[AdminHelper][ACP_EMAIL_SEARCH] no user for email=' . $email);
-            }
-
             $this->load_language();
             $this->template->assign_vars([
                 'S_EMAIL_NOT_FOUND'                  => true,
