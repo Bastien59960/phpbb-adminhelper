@@ -306,9 +306,18 @@ class listener implements EventSubscriberInterface
         }
 
         $message = (string) $event['message'];
-        // Safety rule: keep automatic forum notifications untouched.
-        // AdminHelper one-click headers now apply only to ACP mass emails.
-        $this->notification_email_context = false;
+        $this->notification_email_context = !$this->mass_email_context
+            && $this->is_forum_notification_email_message($message);
+
+        if ($this->notification_email_context)
+        {
+            $message_without_list_header = preg_replace('/^List-Unsubscribe(?:-Post)?:\s*.+\R?/mi', '', $message);
+            if ($message_without_list_header !== null)
+            {
+                $message = ltrim($message_without_list_header, "\r\n");
+                $event['message'] = $message;
+            }
+        }
 
         if (!$this->mass_email_html_enabled || $this->mass_email_html_body === '')
         {
@@ -343,30 +352,72 @@ class listener implements EventSubscriberInterface
         $this->current_unsubscribe_one_click_url = '';
         $this->current_unsubscribe_type = '';
 
-        if (!$this->mass_email_context || !$this->mass_email_one_click_enabled)
+        try
         {
-            return;
-        }
+            if ((!$this->mass_email_context || !$this->mass_email_one_click_enabled) && !$this->notification_email_context)
+            {
+                return;
+            }
 
-        $addresses = (array) $event['addresses'];
-        $recipient = $this->extract_primary_email_recipient($addresses);
-        if (!$recipient)
+            $addresses = isset($event['addresses']) && is_array($event['addresses'])
+                ? $event['addresses']
+                : [];
+            $recipient = $this->extract_primary_email_recipient($addresses);
+            if (!$recipient)
+            {
+                return;
+            }
+
+            $user_row = $this->find_user_for_recipient($recipient['email'], $recipient['name']);
+            if (!$user_row)
+            {
+                return;
+            }
+
+            if ($this->mass_email_context && $this->mass_email_one_click_enabled)
+            {
+                $this->current_unsubscribe_type = 'massmail';
+                $this->current_unsubscribe_one_click_url = $this->build_one_click_unsubscribe_url(
+                    (int) $user_row['user_id'],
+                    (string) $user_row['user_email'],
+                    $this->current_unsubscribe_type
+                );
+                return;
+            }
+
+            if (!$this->notification_email_context)
+            {
+                return;
+            }
+
+            $this->load_language();
+            $this->current_unsubscribe_type = 'forum_notify';
+            $this->current_unsubscribe_one_click_url = $this->build_one_click_unsubscribe_url(
+                (int) $user_row['user_id'],
+                (string) $user_row['user_email'],
+                $this->current_unsubscribe_type
+            );
+
+            $current_message = isset($event['msg']) ? (string) $event['msg'] : '';
+            $unsubscribe_footer = $this->language->lang(
+                'ADMINHELPER_NOTIFY_UNSUBSCRIBE_TEXT',
+                $this->current_unsubscribe_one_click_url,
+                $this->build_notification_preferences_url()
+            );
+            $event['msg'] = $this->append_text_footer(
+                $current_message,
+                $unsubscribe_footer,
+                $this->current_unsubscribe_one_click_url
+            );
+        }
+        catch (\Throwable $exception)
         {
-            return;
+            // Never block outgoing notifications because of unsubscribe header decoration.
+            error_log('[AdminHelper] notification_message_email failed: ' . $exception->getMessage());
+            $this->current_unsubscribe_one_click_url = '';
+            $this->current_unsubscribe_type = '';
+            $this->notification_email_context = false;
         }
-
-        $user_row = $this->find_user_for_recipient($recipient['email'], $recipient['name']);
-        if (!$user_row)
-        {
-            return;
-        }
-
-        $this->current_unsubscribe_type = 'massmail';
-        $this->current_unsubscribe_one_click_url = $this->build_one_click_unsubscribe_url(
-            (int) $user_row['user_id'],
-            (string) $user_row['user_email'],
-            $this->current_unsubscribe_type
-        );
     }
 
     /**
@@ -393,51 +444,73 @@ class listener implements EventSubscriberInterface
      */
     public function modify_email_headers($event)
     {
-        $headers = (array) $event['headers'];
-        $filtered_headers = [];
-
-        if ($this->mass_email_html_enabled && $this->mass_email_boundary !== '')
+        try
         {
-            foreach ($headers as $header)
+            $headers = isset($event['headers']) && is_array($event['headers'])
+                ? $event['headers']
+                : [];
+            $filtered_headers = [];
+
+            if ($this->mass_email_html_enabled && $this->mass_email_boundary !== '')
             {
-                $header = (string) $header;
-                if (stripos($header, 'Content-Type:') === 0 || stripos($header, 'Content-Transfer-Encoding:') === 0)
+                foreach ($headers as $header)
                 {
-                    continue;
+                    $header = (string) $header;
+                    if (stripos($header, 'Content-Type:') === 0 || stripos($header, 'Content-Transfer-Encoding:') === 0)
+                    {
+                        continue;
+                    }
+
+                    $filtered_headers[] = $header;
                 }
 
-                $filtered_headers[] = $header;
+                $filtered_headers[] = 'Content-Type: multipart/alternative; boundary="' . $this->mass_email_boundary . '"';
+                $this->mass_email_boundary = '';
+            }
+            else
+            {
+                $filtered_headers = $headers;
             }
 
-            $filtered_headers[] = 'Content-Type: multipart/alternative; boundary="' . $this->mass_email_boundary . '"';
-            $this->mass_email_boundary = '';
+            $is_forum_notification = $this->notification_email_context && !$this->mass_email_context;
+            if ($this->current_unsubscribe_one_click_url !== '' || $is_forum_notification)
+            {
+                $filtered_headers = $this->remove_headers_by_name($filtered_headers, [
+                    'List-Unsubscribe:',
+                    'List-Unsubscribe-Post:',
+                    'X-AdminHelper-OneClick:',
+                ]);
+
+                $preferences_url = $this->current_unsubscribe_type === 'forum_notify' || $is_forum_notification
+                    ? $this->build_notification_preferences_url()
+                    : $this->build_profile_preferences_url();
+
+                if ($this->current_unsubscribe_one_click_url !== '')
+                {
+                    $filtered_headers[] = 'List-Unsubscribe: <' . $this->current_unsubscribe_one_click_url . '>, <' . $preferences_url . '>';
+                    $filtered_headers[] = 'List-Unsubscribe-Post: List-Unsubscribe=One-Click';
+                    $filtered_headers[] = 'X-AdminHelper-OneClick: 1';
+                }
+                else
+                {
+                    // Fallback to RFC 2369 even if one-click token cannot be built.
+                    $filtered_headers[] = 'List-Unsubscribe: <' . $preferences_url . '>';
+                }
+            }
+
+            $event['headers'] = $filtered_headers;
         }
-        else
+        catch (\Throwable $exception)
         {
-            $filtered_headers = $headers;
+            // Fail open: preserve message delivery even if header decoration fails.
+            error_log('[AdminHelper] modify_email_headers failed: ' . $exception->getMessage());
         }
-
-        if ($this->current_unsubscribe_one_click_url !== '')
+        finally
         {
-            $filtered_headers = $this->remove_headers_by_name($filtered_headers, [
-                'List-Unsubscribe:',
-                'List-Unsubscribe-Post:',
-                'X-AdminHelper-OneClick:',
-            ]);
-
-            $preferences_url = $this->current_unsubscribe_type === 'forum_notify'
-                ? $this->build_notification_preferences_url()
-                : $this->build_profile_preferences_url();
-
-            $filtered_headers[] = 'List-Unsubscribe: <' . $this->current_unsubscribe_one_click_url . '>, <' . $preferences_url . '>';
-            $filtered_headers[] = 'List-Unsubscribe-Post: List-Unsubscribe=One-Click';
-            $filtered_headers[] = 'X-AdminHelper-OneClick: 1';
+            $this->current_unsubscribe_one_click_url = '';
+            $this->current_unsubscribe_type = '';
+            $this->notification_email_context = false;
         }
-
-        $event['headers'] = $filtered_headers;
-        $this->current_unsubscribe_one_click_url = '';
-        $this->current_unsubscribe_type = '';
-        $this->notification_email_context = false;
     }
 
     /**
