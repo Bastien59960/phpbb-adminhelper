@@ -30,6 +30,50 @@ class main_module
             trigger_error($user->lang('ACP_ADMINHELPER_LOG_TABLE_MISSING') . adm_back_link($this->u_action), E_USER_WARNING);
         }
 
+        $start = max(0, (int) $request->variable('start', 0));
+        $per_page = 50;
+        add_form_key('adminhelper_unsubscribe_logs');
+
+        if ($request->is_set_post('delete_logs_all') || $request->is_set_post('delete_logs_selected'))
+        {
+            if (!check_form_key('adminhelper_unsubscribe_logs'))
+            {
+                trigger_error($user->lang('FORM_INVALID') . adm_back_link($this->u_action), E_USER_WARNING);
+            }
+
+            if ($request->is_set_post('delete_logs_all'))
+            {
+                $sql = 'DELETE FROM ' . $log_table;
+                $db->sql_query($sql);
+                $deleted_logs = (int) $db->sql_affectedrows();
+
+                trigger_error($user->lang('ACP_ADMINHELPER_DELETE_ALL_SUCCESS', $deleted_logs) . adm_back_link($this->u_action));
+            }
+
+            $selected_log_ids = [];
+            foreach ($request->variable('log_ids', [0]) as $log_id)
+            {
+                $log_id = (int) $log_id;
+                if ($log_id > 0)
+                {
+                    $selected_log_ids[$log_id] = $log_id;
+                }
+            }
+            $selected_log_ids = array_values($selected_log_ids);
+
+            if (empty($selected_log_ids))
+            {
+                trigger_error($user->lang('ACP_ADMINHELPER_DELETE_NONE_SELECTED') . adm_back_link($this->u_action), E_USER_WARNING);
+            }
+
+            $sql = 'DELETE FROM ' . $log_table . '
+                WHERE ' . $db->sql_in_set('log_id', $selected_log_ids);
+            $db->sql_query($sql);
+            $deleted_logs = (int) $db->sql_affectedrows();
+
+            trigger_error($user->lang('ACP_ADMINHELPER_DELETE_SELECTED_SUCCESS', $deleted_logs) . adm_back_link($this->u_action));
+        }
+
         $action = (string) $request->variable('action', '');
         if ($action === 'restore_notify')
         {
@@ -126,9 +170,6 @@ class main_module
             trigger_error($user->lang('ACP_ADMINHELPER_RESTORE_NOTIFY_SUCCESS') . adm_back_link($this->u_action));
         }
 
-        $start = max(0, (int) $request->variable('start', 0));
-        $per_page = 50;
-
         $sql = 'SELECT COUNT(user_id) AS total_members,
                        SUM(CASE WHEN user_allow_massemail = 1 THEN 1 ELSE 0 END) AS massmail_subscribed,
                        SUM(CASE WHEN user_notify = 1 AND user_notify_type IN (' . NOTIFY_EMAIL . ', ' . NOTIFY_BOTH . ') THEN 1 ELSE 0 END) AS forum_notify_subscribed
@@ -168,6 +209,7 @@ class main_module
             $request_user_agent = trim((string) $row['request_user_agent']);
 
             $template->assign_block_vars('logs', [
+                'LOG_ID' => (int) $row['log_id'],
                 'LOGGED_AT' => ((int) $row['logged_at'] > 0) ? $user->format_date((int) $row['logged_at']) : '-',
                 'TYPE_LABEL' => $type_label,
                 'STATUS_LABEL' => $status_label,
@@ -195,6 +237,8 @@ class main_module
         $pagination->generate_template_pagination($this->u_action, 'pagination', 'start', $total_logs, $per_page, $start);
 
         $template->assign_vars([
+            'U_ACTION' => $this->u_action,
+            'START' => $start,
             'TOTAL_MEMBERS_COUNTED' => $total_members,
             'MASSMAIL_SUBSCRIBED' => $massmail_subscribed,
             'MASSMAIL_UNSUBSCRIBED' => $massmail_unsubscribed,
