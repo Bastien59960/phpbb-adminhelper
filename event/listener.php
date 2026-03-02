@@ -1029,24 +1029,9 @@ class listener implements EventSubscriberInterface
             return 0;
         }
 
-        $email_hash = (string) phpbb_email_hash($email);
         $sql = 'SELECT user_id
             FROM ' . USERS_TABLE . "
-            WHERE user_email_hash = '" . $this->db->sql_escape($email_hash) . "'
-            ORDER BY user_id ASC";
-        $result = $this->db->sql_query_limit($sql, 1);
-        $user_id = (int) $this->db->sql_fetchfield('user_id');
-        $this->db->sql_freeresult($result);
-
-        if ($user_id > 0)
-        {
-            return $user_id;
-        }
-
-        // Compatibility fallback for legacy rows without user_email_hash.
-        $sql = 'SELECT user_id
-            FROM ' . USERS_TABLE . "
-            WHERE user_email = '" . $this->db->sql_escape($email) . "'
+            WHERE LOWER(user_email) = '" . $this->db->sql_escape($email) . "'
             ORDER BY user_id ASC";
         $result = $this->db->sql_query_limit($sql, 1);
         $user_id = (int) $this->db->sql_fetchfield('user_id');
