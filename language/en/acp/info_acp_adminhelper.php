@@ -23,6 +23,7 @@ $lang = array_merge($lang, [
     'ACP_ADMINHELPER_NOTIF_CLEANUP_TITLE' => 'Old notifications cleanup',
     'ACP_ADMINHELPER_NOTIF_CLEANUP_COUNT' => 'Unread notifications older than threshold',
     'ACP_ADMINHELPER_NOTIF_CLEANUP_DAYS' => 'Age threshold (days)',
+    'ACP_ADMINHELPER_NOTIF_CLEANUP_REFRESH' => 'Refresh',
     'ACP_ADMINHELPER_NOTIF_CLEANUP_ACTION' => 'Delete old notifications',
     'ACP_ADMINHELPER_NOTIF_CLEANUP_CONFIRM' => 'Delete unread notifications older than the selected threshold?',
     'ACP_ADMINHELPER_NOTIF_CLEANUP_SUCCESS' => '%1$d old unread notification(s) deleted (threshold: %2$d days).',

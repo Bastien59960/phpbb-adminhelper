@@ -41,7 +41,10 @@
     </dl>
     <dl>
         <dt><label for="cleanup_days">{L_ACP_ADMINHELPER_NOTIF_CLEANUP_DAYS}:</label></dt>
-        <dd><input type="number" min="30" max="3650" name="cleanup_days" id="cleanup_days" value="{{ CLEANUP_DAYS|e('html_attr') }}" /></dd>
+        <dd>
+            <input type="number" min="30" max="3650" name="cleanup_days" id="cleanup_days" value="{{ CLEANUP_DAYS|e('html_attr') }}" onchange="this.form.submit();" />
+            <input type="submit" name="refresh_cleanup_preview" class="button2" value="{L_ACP_ADMINHELPER_NOTIF_CLEANUP_REFRESH}" />
+        </dd>
     </dl>
     <p class="submit-buttons">
         <input type="submit" name="cleanup_old_notifications" class="button2" value="{L_ACP_ADMINHELPER_NOTIF_CLEANUP_ACTION}" onclick="return confirm('{L_ACP_ADMINHELPER_NOTIF_CLEANUP_CONFIRM|e('js')}');" />

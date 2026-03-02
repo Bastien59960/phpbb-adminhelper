@@ -23,6 +23,7 @@ $lang = array_merge($lang, [
     'ACP_ADMINHELPER_NOTIF_CLEANUP_TITLE' => 'Bereinigung alter Benachrichtigungen',
     'ACP_ADMINHELPER_NOTIF_CLEANUP_COUNT' => 'Ungelesene Benachrichtigungen aelter als der Schwellwert',
     'ACP_ADMINHELPER_NOTIF_CLEANUP_DAYS' => 'Altersschwellwert (Tage)',
+    'ACP_ADMINHELPER_NOTIF_CLEANUP_REFRESH' => 'Aktualisieren',
     'ACP_ADMINHELPER_NOTIF_CLEANUP_ACTION' => 'Alte Benachrichtigungen loeschen',
     'ACP_ADMINHELPER_NOTIF_CLEANUP_CONFIRM' => 'Ungelesene Benachrichtigungen loeschen, die aelter als der gewaehlte Schwellwert sind?',
     'ACP_ADMINHELPER_NOTIF_CLEANUP_SUCCESS' => '%1$d alte ungelesene Benachrichtigung(en) geloescht (Schwellwert: %2$d Tage).',

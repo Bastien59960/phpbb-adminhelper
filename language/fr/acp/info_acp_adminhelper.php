@@ -23,6 +23,7 @@ $lang = array_merge($lang, [
     'ACP_ADMINHELPER_NOTIF_CLEANUP_TITLE' => 'Nettoyage des vieilles notifications',
     'ACP_ADMINHELPER_NOTIF_CLEANUP_COUNT' => 'Notifications non lues plus anciennes que le seuil',
     'ACP_ADMINHELPER_NOTIF_CLEANUP_DAYS' => 'Seuil d anciennete (jours)',
+    'ACP_ADMINHELPER_NOTIF_CLEANUP_REFRESH' => 'Actualiser',
     'ACP_ADMINHELPER_NOTIF_CLEANUP_ACTION' => 'Supprimer les vieilles notifications',
     'ACP_ADMINHELPER_NOTIF_CLEANUP_CONFIRM' => 'Supprimer les notifications non lues plus anciennes que le seuil choisi ?',
     'ACP_ADMINHELPER_NOTIF_CLEANUP_SUCCESS' => '%1$d vieille(s) notification(s) non lue(s) supprimee(s) (seuil : %2$d jours).',
