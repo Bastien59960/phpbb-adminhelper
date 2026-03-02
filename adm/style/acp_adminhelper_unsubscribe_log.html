@@ -51,27 +51,27 @@
     <tbody>
         {% for log in logs %}
             <tr class="{% if loop.index is odd %}row1{% else %}row2{% endif %}">
-                <td>{{ log.LOGGED_AT }}</td>
-                <td>{{ log.TYPE_LABEL }}</td>
-                <td>{{ log.STATUS_LABEL }}</td>
+                <td>{{ log.LOGGED_AT|e }}</td>
+                <td>{{ log.TYPE_LABEL|e }}</td>
+                <td>{{ log.STATUS_LABEL|e }}</td>
                 <td>
                     {% if log.U_USER_PROFILE %}
-                        <a href="{{ log.U_USER_PROFILE }}">{{ log.USER_ID }}</a>
+                        <a href="{{ log.U_USER_PROFILE|e('html_attr') }}">{{ log.USER_ID|e }}</a>
                     {% else %}
-                        {{ log.USER_ID }}
+                        {{ log.USER_ID|e }}
                     {% endif %}
                 </td>
-                <td><code>{{ log.USER_EMAIL }}</code></td>
-                <td>{{ log.HTTP_STATUS }}</td>
-                <td>{{ log.REQUEST_METHOD }}</td>
-                <td><code>{{ log.REQUEST_IP }}</code></td>
-                <td>{{ log.TOKEN_EXPIRES_AT }}</td>
-                <td title="{{ log.USER_AGENT }}">{{ log.USER_AGENT_SHORT }}</td>
+                <td><code>{{ log.USER_EMAIL|e }}</code></td>
+                <td>{{ log.HTTP_STATUS|e }}</td>
+                <td>{{ log.REQUEST_METHOD|e }}</td>
+                <td><code>{{ log.REQUEST_IP|e }}</code></td>
+                <td>{{ log.TOKEN_EXPIRES_AT|e }}</td>
+                <td title="{{ log.USER_AGENT|e('html_attr') }}">{{ log.USER_AGENT_SHORT|e }}</td>
                 <td>
                     {% if log.CAN_RESTORE_NOTIFY %}
-                        <a href="{{ log.U_RESTORE_NOTIFY }}" class="button2" onclick="return confirm('{{ log.RESTORE_NOTIFY_CONFIRM|e('js') }}');">{{ log.RESTORE_NOTIFY_LABEL }}</a>
+                        <a href="{{ log.U_RESTORE_NOTIFY|e('html_attr') }}" class="button2" onclick="return confirm('{{ log.RESTORE_NOTIFY_CONFIRM|e('js') }}');">{{ log.RESTORE_NOTIFY_LABEL|e }}</a>
                     {% else %}
-                        {{ log.ACTION_NONE_LABEL }}
+                        {{ log.ACTION_NONE_LABEL|e }}
                     {% endif %}
                 </td>
             </tr>

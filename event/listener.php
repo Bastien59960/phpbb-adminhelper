@@ -73,6 +73,17 @@ class listener implements EventSubscriberInterface
         $this->handle_unsubscribe_request();
         $this->prepare_mass_email_message_fallback();
 
+        if (!defined('IN_ADMIN') || $this->request->variable('i', '') !== 'acp_users')
+        {
+            return;
+        }
+
+        global $auth;
+        if (!isset($auth) || !$auth->acl_get('a_user'))
+        {
+            return;
+        }
+
         $email = $this->request->variable('email_search', '', true);
         if (!$email)
         {
@@ -740,8 +751,8 @@ class listener implements EventSubscriberInterface
 
         if (!$user_row)
         {
-            $this->log_unsubscribe_event('user_not_found', 404, $log_context);
-            $this->send_unsubscribe_text_response(404, $this->language->lang('ADMINHELPER_UNSUB_USER_NOT_FOUND'));
+            $this->log_unsubscribe_event('user_not_found', 403, $log_context);
+            $this->send_unsubscribe_text_response(403, $this->language->lang('ADMINHELPER_UNSUB_INVALID_SIGNATURE'));
         }
 
         $log_context['user_id'] = (int) $user_row['user_id'];
@@ -1079,6 +1090,14 @@ class listener implements EventSubscriberInterface
         $request_method = strtoupper((string) $this->request->server('REQUEST_METHOD', 'GET'));
         $request_ip = (string) $this->request->server('REMOTE_ADDR', '');
         $request_user_agent = (string) $this->request->server('HTTP_USER_AGENT', '');
+        $status = strtolower(trim((string) $status));
+
+        if (
+            in_array($status, ['invalid_request', 'user_not_found', 'invalid_signature', 'expired_token'], true)
+            && $this->is_unsubscribe_log_rate_limited($request_ip, $status)
+        ) {
+            return;
+        }
 
         $log_data = [
             'user_id' => isset($context['user_id']) ? (int) $context['user_id'] : 0,
@@ -1086,7 +1105,7 @@ class listener implements EventSubscriberInterface
             'unsubscribe_type' => substr($this->normalize_unsubscribe_type($context['unsubscribe_type'] ?? 'massmail'), 0, 32),
             'token_expires_at' => isset($context['token_expires_at']) ? (int) $context['token_expires_at'] : 0,
             'http_status' => (int) $http_status,
-            'event_status' => substr(strtolower(trim((string) $status)), 0, 32),
+            'event_status' => substr($status, 0, 32),
             'request_method' => substr($request_method, 0, 8),
             'request_ip' => substr($request_ip, 0, 40),
             'request_user_agent' => substr($request_user_agent, 0, 255),
@@ -1096,6 +1115,31 @@ class listener implements EventSubscriberInterface
         $sql = 'INSERT INTO ' . $this->get_unsubscribe_log_table() . ' '
             . $this->db->sql_build_array('INSERT', $log_data);
         $this->db->sql_query($sql);
+    }
+
+    private function is_unsubscribe_log_rate_limited($request_ip, $status)
+    {
+        $request_ip = substr(trim((string) $request_ip), 0, 40);
+        $status = substr(strtolower(trim((string) $status)), 0, 32);
+        if ($request_ip === '' || $status === '')
+        {
+            return false;
+        }
+
+        // Limit repeated invalid events per IP to reduce log-flood abuse.
+        $window_seconds = 300;
+        $max_events = 20;
+
+        $sql = 'SELECT COUNT(log_id) AS total_events
+            FROM ' . $this->get_unsubscribe_log_table() . "
+            WHERE request_ip = '" . $this->db->sql_escape($request_ip) . "'
+                AND event_status = '" . $this->db->sql_escape($status) . "'
+                AND logged_at >= " . (time() - $window_seconds);
+        $result = $this->db->sql_query($sql);
+        $total_events = (int) $this->db->sql_fetchfield('total_events');
+        $this->db->sql_freeresult($result);
+
+        return $total_events >= $max_events;
     }
 
     private function is_unsubscribe_log_enabled()
