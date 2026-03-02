@@ -1,58 +1,86 @@
-# Admin Helper — Extension phpBB
+# Admin Helper - Extension phpBB
 
-Extension pour phpBB 3.3 qui ajoute un champ de recherche par **adresse email** dans la page de gestion des membres de l'ACP.
+Extension phpBB 3.3 pour administrer plus facilement les membres et les envois email, avec gestion de desinscription conforme RFC8058.
 
-## Fonctionnalité
+## Fonctions principales
 
-Dans **ACP > Membres et Groupes > Gérer les utilisateurs**, un champ "Rechercher par email" est ajouté sous le champ "Saisissez le nom d'utilisateur". Cela permet de trouver un membre directement par son email sans passer par le popup de recherche avancée.
+### 1) Recherche membre par email dans l'ACP
 
-### Avant
-![Seul le champ "nom d'utilisateur" est disponible](https://img.shields.io/badge/Recherche-par%20pseudo%20uniquement-red)
+Dans `ACP > Membres et Groupes > Gerer les utilisateurs`, l'extension ajoute un champ de recherche par adresse email.
 
-### Après
-![Recherche par pseudo OU par email](https://img.shields.io/badge/Recherche-par%20pseudo%20%2B%20email-green)
+### 2) Emails de masse admin (ACP)
 
-## Installation
+Dans `ACP > General > Client communication > Email`:
 
-1. Copier le dossier `bastien59960/adminhelper` dans `/ext/` de votre forum phpBB
-2. Aller dans **ACP > Personnaliser > Extensions**
-3. Activer **Admin Helper**
+- Edition texte + HTML (multipart/alternative)
+- Ajout d'un footer de desinscription
+- En-tetes one-click:
+  - `List-Unsubscribe`
+  - `List-Unsubscribe-Post: List-Unsubscribe=One-Click`
+- Envoi unitaire pour one-click (chunk size force a 1)
+- Throttle anti-burst `500ms` entre messages dans le process queue
 
+### 3) Desinscription distincte par type
+
+Le token de desinscription prend en charge deux types:
+
+- `massmail`: desinscription des emails de masse administrateur
+- `forum_notify`: desinscription des notifications email forum
+
+Chaque type a son propre traitement, son propre texte de confirmation, et son propre logging.
+
+### 4) Logs ACP + compteurs globaux
+
+Nouvelle page ACP:
+
+- `ACP > Extensions > Admin Helper > Logs desinscription`
+
+Elle affiche:
+
+- Compteurs globaux:
+  - Membres inscrits/desinscrits emails de masse
+  - Membres inscrits/desinscrits notifications forum (email)
+- Journal detaille:
+  - date, type, statut, user, email, HTTP, methode, IP, expiration token, user-agent
+
+### 5) Action admin "Annuler" (restauration)
+
+Sur les lignes de log `forum_notify`, un bouton ACP permet de re-activer les notifications email pour un membre qui s'est trompe.
+
+Effets de l'action:
+
+- remet `user_notify = 1`
+- convertit `user_notify_type` `IM -> BOTH` si necessaire
+- remet `notify = 1` dans `user_notifications` pour `notification.method.email`
+- ecrit un event de log `admin_restored`
+
+## Schema et migrations
+
+- `release_1_0_1`: creation table `*_adminhelper_unsubscribe_log` + module ACP
+- `release_1_0_2`: ajout colonne `unsubscribe_type` (+ index)
+
+## Installation / mise a jour
+
+1. Copier `ext/bastien59960/adminhelper`
+2. Activer l'extension dans l'ACP
+3. Lancer les migrations:
+
+```bash
+php bin/phpbbcli.php db:migrate
+php bin/phpbbcli.php cache:purge
 ```
-ext/
-└── bastien59960/
-    └── adminhelper/
-        ├── composer.json
-        ├── ext.php
-        ├── config/
-        │   └── services.yml
-        ├── event/
-        │   └── listener.php
-        ├── adm/style/event/
-        │   └── acp_overall_footer_after.html
-        └── language/
-            ├── en/
-            │   └── info_acp_adminhelper.php
-            └── fr/
-                └── info_acp_adminhelper.php
-```
 
-## Compatibilité
+## Compatibilite
 
-- **phpBB** : 3.3.0 et supérieur
-- **PHP** : 7.1.3 et supérieur
+- phpBB `>= 3.3.0`
+- PHP `>= 7.1.3`
 
-## Fonctionnement technique
+## Langues
 
-L'extension utilise deux mécanismes phpBB :
+Clés de langue fournies pour:
 
-1. **Template event** `acp_overall_footer_after` : injecte un script JavaScript qui ajoute le champ email dans le formulaire de sélection d'utilisateur de l'ACP (le bloc `S_SELECT_USER` n'a pas de template event dédié)
-2. **Event listeners** :
-   - `core.common` : intercepte le POST du champ email, effectue la recherche en base de données, et injecte le `user_id` trouvé via `request::overwrite()` avant que le module ACP ne traite la requête
-   - `core.adm_page_header_after` : active l'injection du JavaScript dans le footer ACP
-
-Aucune modification de la base de données n'est nécessaire — l'extension utilise la colonne `user_email` existante de la table `phpbb_users`.
+- `fr`, `en`, `de`, `es`, `it`
 
 ## Licence
 
-[GPLv2](https://opensource.org/licenses/GPL-2.0)
+GPL-2.0-only

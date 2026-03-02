@@ -3,7 +3,7 @@
     "type": "phpbb-extension",
     "description": "Ajoute un champ de recherche par email dans la gestion des membres de l'ACP phpBB.",
     "homepage": "https://github.com/Bastien59960/phpbb-adminhelper",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "license": "GPL-2.0-only",
     "authors": [
         {

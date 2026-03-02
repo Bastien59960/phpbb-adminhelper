@@ -1,0 +1,66 @@
+<dl>
+    <dt>
+        <label for="adminhelper_message_html">{ADMINHELPER_HTML_MESSAGE_LABEL}{L_COLON}</label><br />
+        <span>{ADMINHELPER_HTML_MESSAGE_EXPLAIN}</span>
+    </dt>
+    <dd>
+        <textarea id="adminhelper_message_html" name="adminhelper_message_html" rows="12" cols="60">{ADMINHELPER_HTML_MESSAGE_VALUE}</textarea>
+    </dd>
+</dl>
+<dl>
+    <dt>
+        <label for="adminhelper_use_html">{ADMINHELPER_USE_HTML_LABEL}{L_COLON}</label><br />
+        <span>{ADMINHELPER_USE_HTML_EXPLAIN}</span>
+    </dt>
+    <dd>
+        <input id="adminhelper_use_html" name="adminhelper_use_html" type="checkbox" class="radio" value="1"<!-- IF S_ADMINHELPER_USE_HTML_EMAIL --> checked="checked"<!-- ENDIF --> />
+    </dd>
+</dl>
+<dl>
+    <dt>
+        <label for="adminhelper_append_unsubscribe">{ADMINHELPER_APPEND_UNSUBSCRIBE_LABEL}{L_COLON}</label><br />
+        <span>{ADMINHELPER_APPEND_UNSUBSCRIBE_EXPLAIN}</span>
+    </dt>
+    <dd>
+        <input id="adminhelper_append_unsubscribe" name="adminhelper_append_unsubscribe" type="checkbox" class="radio" value="1"<!-- IF S_ADMINHELPER_APPEND_UNSUBSCRIBE --> checked="checked"<!-- ENDIF --> />
+    </dd>
+</dl>
+<dl>
+    <dt>
+        <label for="adminhelper_enable_one_click">{ADMINHELPER_ENABLE_ONE_CLICK_LABEL}{L_COLON}</label><br />
+        <span>{ADMINHELPER_ENABLE_ONE_CLICK_EXPLAIN}</span>
+    </dt>
+    <dd>
+        <input id="adminhelper_enable_one_click" name="adminhelper_enable_one_click" type="checkbox" class="radio" value="1"<!-- IF S_ADMINHELPER_ENABLE_ONE_CLICK --> checked="checked"<!-- ENDIF --> />
+    </dd>
+</dl>
+
+<script>
+(function () {
+    var form = document.getElementById('acp_email');
+    var useHtml = document.getElementById('adminhelper_use_html');
+    var htmlField = document.getElementById('adminhelper_message_html');
+    var textField = document.getElementById('message');
+
+    if (!form || !useHtml || !htmlField || !textField) {
+        return;
+    }
+
+    form.addEventListener('submit', function () {
+        if (!useHtml.checked || textField.value.trim() !== '' || htmlField.value.trim() === '') {
+            return;
+        }
+
+        var tmp = document.createElement('div');
+        tmp.innerHTML = htmlField.value;
+        var fallbackText = (tmp.textContent || tmp.innerText || '')
+            .replace(/\u00a0/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        if (fallbackText !== '') {
+            textField.value = fallbackText;
+        }
+    });
+})();
+</script>

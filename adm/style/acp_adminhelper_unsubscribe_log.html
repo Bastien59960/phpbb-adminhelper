@@ -1,0 +1,107 @@
+{% include 'overall_header.html' %}
+
+<h1>{L_ACP_ADMINHELPER_UNSUBSCRIBE_LOGS}</h1>
+<p>{L_ACP_ADMINHELPER_UNSUBSCRIBE_LOGS_EXPLAIN}</p>
+
+<fieldset>
+    <legend>{L_ACP_ADMINHELPER_COUNTER_OVERVIEW}</legend>
+    <dl>
+        <dt><label>{L_ACP_ADMINHELPER_COUNTER_TOTAL_MEMBERS}:</label></dt>
+        <dd><strong>{{ TOTAL_MEMBERS_COUNTED }}</strong></dd>
+    </dl>
+    <dl>
+        <dt><label>{L_ACP_ADMINHELPER_COUNTER_MASSMAIL}:</label></dt>
+        <dd>
+            {L_ACP_ADMINHELPER_COUNTER_SUBSCRIBED}: <strong>{{ MASSMAIL_SUBSCRIBED }}</strong>
+            /
+            {L_ACP_ADMINHELPER_COUNTER_UNSUBSCRIBED}: <strong>{{ MASSMAIL_UNSUBSCRIBED }}</strong>
+        </dd>
+    </dl>
+    <dl>
+        <dt><label>{L_ACP_ADMINHELPER_COUNTER_FORUM_NOTIFY}:</label></dt>
+        <dd>
+            {L_ACP_ADMINHELPER_COUNTER_SUBSCRIBED}: <strong>{{ FORUM_NOTIFY_SUBSCRIBED }}</strong>
+            /
+            {L_ACP_ADMINHELPER_COUNTER_UNSUBSCRIBED}: <strong>{{ FORUM_NOTIFY_UNSUBSCRIBED }}</strong>
+        </dd>
+    </dl>
+</fieldset>
+
+<fieldset>
+    <legend>{L_ACP_ADMINHELPER_LOG_TOTAL}</legend>
+    <p><strong>{{ TOTAL_LOGS }}</strong></p>
+</fieldset>
+
+<table class="table1">
+    <thead>
+        <tr>
+            <th>{L_ACP_ADMINHELPER_LOG_COL_DATE}</th>
+            <th>{L_ACP_ADMINHELPER_LOG_COL_TYPE}</th>
+            <th>{L_ACP_ADMINHELPER_LOG_COL_STATUS}</th>
+            <th>{L_ACP_ADMINHELPER_LOG_COL_USER}</th>
+            <th>{L_ACP_ADMINHELPER_LOG_COL_EMAIL}</th>
+            <th>{L_ACP_ADMINHELPER_LOG_COL_HTTP}</th>
+            <th>{L_ACP_ADMINHELPER_LOG_COL_METHOD}</th>
+            <th>{L_ACP_ADMINHELPER_LOG_COL_IP}</th>
+            <th>{L_ACP_ADMINHELPER_LOG_COL_TOKEN_EXP}</th>
+            <th>{L_ACP_ADMINHELPER_LOG_COL_UA}</th>
+            <th>{L_ACP_ADMINHELPER_LOG_COL_ACTIONS}</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for log in logs %}
+            <tr class="{% if loop.index is odd %}row1{% else %}row2{% endif %}">
+                <td>{{ log.LOGGED_AT }}</td>
+                <td>{{ log.TYPE_LABEL }}</td>
+                <td>{{ log.STATUS_LABEL }}</td>
+                <td>
+                    {% if log.U_USER_PROFILE %}
+                        <a href="{{ log.U_USER_PROFILE }}">{{ log.USER_ID }}</a>
+                    {% else %}
+                        {{ log.USER_ID }}
+                    {% endif %}
+                </td>
+                <td><code>{{ log.USER_EMAIL }}</code></td>
+                <td>{{ log.HTTP_STATUS }}</td>
+                <td>{{ log.REQUEST_METHOD }}</td>
+                <td><code>{{ log.REQUEST_IP }}</code></td>
+                <td>{{ log.TOKEN_EXPIRES_AT }}</td>
+                <td title="{{ log.USER_AGENT }}">{{ log.USER_AGENT_SHORT }}</td>
+                <td>
+                    {% if log.CAN_RESTORE_NOTIFY %}
+                        <a href="{{ log.U_RESTORE_NOTIFY }}" class="button2" onclick="return confirm('{{ log.RESTORE_NOTIFY_CONFIRM|e('js') }}');">{{ log.RESTORE_NOTIFY_LABEL }}</a>
+                    {% else %}
+                        {{ log.ACTION_NONE_LABEL }}
+                    {% endif %}
+                </td>
+            </tr>
+        {% else %}
+            <tr class="row1">
+                <td colspan="11">{L_ACP_ADMINHELPER_LOG_NO_ROWS}</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if pagination %}
+<div class="pagination">
+    <ul>
+        {% for page in pagination %}
+            {% if page.S_IS_PREV %}
+                <li><a href="{{ page.PAGE_URL }}">{{ lang('PREVIOUS') }}</a></li>
+            {% elseif page.S_IS_CURRENT %}
+                <li class="active"><span>{{ page.PAGE_NUMBER }}</span></li>
+            {% elseif page.S_IS_ELLIPSIS %}
+                <li class="ellipsis"><span>{{ lang('ELLIPSIS') }}</span></li>
+            {% elseif page.S_IS_NEXT %}
+                <li><a href="{{ page.PAGE_URL }}">{{ lang('NEXT') }}</a></li>
+            {% else %}
+                <li><a href="{{ page.PAGE_URL }}">{{ page.PAGE_NUMBER }}</a></li>
+            {% endif %}
+        {% endfor %}
+    </ul>
+</div>
+<p class="pagination">{{ S_ON_PAGE }}</p>
+{% endif %}
+
+{% include 'overall_footer.html' %}
