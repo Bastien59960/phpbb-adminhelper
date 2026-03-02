@@ -57,15 +57,55 @@ class main_module
                 SET user_notify = 1,
                     user_notify_type = CASE
                         WHEN user_notify_type = ' . NOTIFY_IM . ' THEN ' . NOTIFY_BOTH . '
-                        ELSE user_notify_type
+                        WHEN user_notify_type IN (' . NOTIFY_EMAIL . ', ' . NOTIFY_BOTH . ') THEN user_notify_type
+                        ELSE ' . NOTIFY_EMAIL . '
                     END
                 WHERE user_id = ' . $restore_user_id;
             $db->sql_query($sql);
+
+            $missing_rows = [];
+            $sql = 'SELECT nt.notification_type_name
+                FROM ' . NOTIFICATION_TYPES_TABLE . ' nt
+                LEFT JOIN ' . USER_NOTIFICATIONS_TABLE . " un
+                    ON un.user_id = " . $restore_user_id . "
+                        AND un.item_type = nt.notification_type_name
+                        AND un.item_id = 0
+                        AND un.method = 'notification.method.email'
+                WHERE nt.notification_type_enabled = 1
+                    AND un.user_id IS NULL";
+            $result = $db->sql_query($sql);
+            while ($row = $db->sql_fetchrow($result))
+            {
+                $missing_rows[] = [
+                    'item_type' => (string) $row['notification_type_name'],
+                    'item_id' => 0,
+                    'user_id' => $restore_user_id,
+                    'method' => 'notification.method.email',
+                    'notify' => 1,
+                ];
+            }
+            $db->sql_freeresult($result);
+
+            if (!empty($missing_rows))
+            {
+                $db->sql_multi_insert(USER_NOTIFICATIONS_TABLE, $missing_rows);
+            }
 
             $sql = 'UPDATE ' . USER_NOTIFICATIONS_TABLE . "
                 SET notify = 1
                 WHERE user_id = " . $restore_user_id . "
                     AND method = 'notification.method.email'";
+            $db->sql_query($sql);
+
+            // Remet les surveillances en etat "pretes a notifier".
+            $sql = 'UPDATE ' . TOPICS_WATCH_TABLE . '
+                SET notify_status = 0
+                WHERE user_id = ' . $restore_user_id;
+            $db->sql_query($sql);
+
+            $sql = 'UPDATE ' . FORUMS_WATCH_TABLE . '
+                SET notify_status = 0
+                WHERE user_id = ' . $restore_user_id;
             $db->sql_query($sql);
 
             $log_data = [

@@ -372,7 +372,8 @@ class listener implements EventSubscriberInterface
                 $this->current_unsubscribe_one_click_url = $this->build_one_click_unsubscribe_url(
                     (int) $user_row['user_id'],
                     (string) $user_row['user_email'],
-                    $this->current_unsubscribe_type
+                    $this->current_unsubscribe_type,
+                    (string) ($user_row['user_lang'] ?? '')
                 );
                 return;
             }
@@ -382,12 +383,14 @@ class listener implements EventSubscriberInterface
                 return;
             }
 
+            $this->apply_unsubscribe_language((string) ($user_row['user_lang'] ?? ''));
             $this->load_language();
             $this->current_unsubscribe_type = 'forum_notify';
             $this->current_unsubscribe_one_click_url = $this->build_one_click_unsubscribe_url(
                 (int) $user_row['user_id'],
                 (string) $user_row['user_email'],
-                $this->current_unsubscribe_type
+                $this->current_unsubscribe_type,
+                (string) ($user_row['user_lang'] ?? '')
             );
 
             $current_message = isset($event['msg']) ? (string) $event['msg'] : '';
@@ -756,11 +759,17 @@ class listener implements EventSubscriberInterface
         $expires_at = (int) $this->request->variable('exp', 0);
         $signature = $this->normalize_unsubscribe_signature((string) $this->request->variable('sig', '', true));
         $unsubscribe_type = $this->normalize_unsubscribe_type((string) $this->request->variable('t', 'massmail', true));
+        $requested_lang = $this->normalize_unsubscribe_language((string) $this->request->variable('lang', '', true));
         $log_context = [
             'user_id' => $user_id,
             'token_expires_at' => $expires_at,
             'unsubscribe_type' => $unsubscribe_type,
         ];
+
+        if ($requested_lang !== '')
+        {
+            $this->apply_unsubscribe_language($requested_lang);
+        }
         $this->load_language();
 
         if ($user_id <= 0 || $expires_at <= 0 || $signature === '')
@@ -769,7 +778,7 @@ class listener implements EventSubscriberInterface
             $this->send_unsubscribe_text_response(400, $this->language->lang('ADMINHELPER_UNSUB_INVALID_REQUEST'));
         }
 
-        $sql = 'SELECT user_id, user_email, user_allow_massemail, user_notify, user_notify_type
+        $sql = 'SELECT user_id, user_email, user_allow_massemail, user_notify, user_notify_type, user_lang
             FROM ' . USERS_TABLE . '
             WHERE user_id = ' . (int) $user_id;
         $result = $this->db->sql_query($sql);
@@ -784,6 +793,12 @@ class listener implements EventSubscriberInterface
 
         $log_context['user_id'] = (int) $user_row['user_id'];
         $log_context['user_email'] = (string) $user_row['user_email'];
+
+        if ($requested_lang === '')
+        {
+            $this->apply_unsubscribe_language((string) ($user_row['user_lang'] ?? ''));
+            $this->load_language();
+        }
 
         $expected_signature = $this->build_unsubscribe_signature(
             (int) $user_row['user_id'],
@@ -866,7 +881,8 @@ class listener implements EventSubscriberInterface
             $this->build_one_click_unsubscribe_url(
                 (int) $user_row['user_id'],
                 (string) $user_row['user_email'],
-                $unsubscribe_type
+                $unsubscribe_type,
+                (string) ($user_row['user_lang'] ?? '')
             ),
             ENT_COMPAT,
             'UTF-8'
@@ -896,23 +912,30 @@ class listener implements EventSubscriberInterface
         $this->send_unsubscribe_html_response(200, $html);
     }
 
-    private function build_one_click_unsubscribe_url($user_id, $user_email, $unsubscribe_type = 'massmail')
+    private function build_one_click_unsubscribe_url($user_id, $user_email, $unsubscribe_type = 'massmail', $user_lang = '')
     {
         $expires_at = time() + 2592000;
         $unsubscribe_type = $this->normalize_unsubscribe_type($unsubscribe_type);
         $signature = $this->build_unsubscribe_signature((int) $user_id, (string) $user_email, $expires_at, $unsubscribe_type);
+        $normalized_lang = $this->normalize_unsubscribe_language($user_lang);
 
         $base_url = function_exists('generate_board_url')
             ? generate_board_url() . '/index.php'
             : '/index.php';
 
-        return $base_url . '?' . http_build_query([
+        $params = [
             'adminhelper_unsub' => 1,
             'u' => (int) $user_id,
             'exp' => $expires_at,
             't' => $unsubscribe_type,
             'sig' => $signature,
-        ], '', '&', PHP_QUERY_RFC3986);
+        ];
+        if ($normalized_lang !== '')
+        {
+            $params['lang'] = $normalized_lang;
+        }
+
+        return $base_url . '?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986);
     }
 
     private function build_unsubscribe_signature($user_id, $user_email, $expires_at, $unsubscribe_type = 'massmail')
@@ -937,6 +960,40 @@ class listener implements EventSubscriberInterface
     {
         $unsubscribe_type = strtolower(trim((string) $unsubscribe_type));
         return $unsubscribe_type === 'forum_notify' ? 'forum_notify' : 'massmail';
+    }
+
+    private function normalize_unsubscribe_language($language_iso)
+    {
+        $language_iso = strtolower(trim((string) $language_iso));
+        if ($language_iso === '' || !preg_match('/^[a-z][a-z0-9_]{1,15}$/', $language_iso))
+        {
+            return '';
+        }
+
+        return $language_iso;
+    }
+
+    private function apply_unsubscribe_language($language_iso)
+    {
+        $language_iso = $this->normalize_unsubscribe_language($language_iso);
+        if ($language_iso === '')
+        {
+            return;
+        }
+
+        if (!method_exists($this->language, 'set_user_language'))
+        {
+            return;
+        }
+
+        try
+        {
+            $this->language->set_user_language($language_iso);
+        }
+        catch (\Throwable $exception)
+        {
+            // Ne jamais bloquer un email ou une desinscription pour un souci de langue.
+        }
     }
 
     private function normalize_unsubscribe_signature($signature)
@@ -1055,7 +1112,7 @@ class listener implements EventSubscriberInterface
         $user_row = false;
         if ($name !== '')
         {
-            $sql = 'SELECT user_id, user_email, user_notify, user_notify_type
+            $sql = 'SELECT user_id, user_email, user_notify, user_notify_type, user_lang
                 FROM ' . USERS_TABLE . "
                 WHERE user_email = '" . $this->db->sql_escape($email) . "'
                     AND username = '" . $this->db->sql_escape($name) . "'";
@@ -1066,7 +1123,7 @@ class listener implements EventSubscriberInterface
 
         if (!$user_row)
         {
-            $sql = 'SELECT user_id, user_email, user_notify, user_notify_type
+            $sql = 'SELECT user_id, user_email, user_notify, user_notify_type, user_lang
                 FROM ' . USERS_TABLE . "
                 WHERE user_email = '" . $this->db->sql_escape($email) . "'
                 ORDER BY user_id ASC";
