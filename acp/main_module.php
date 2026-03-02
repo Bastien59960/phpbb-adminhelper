@@ -32,13 +32,28 @@ class main_module
 
         $start = max(0, (int) $request->variable('start', 0));
         $per_page = 50;
+        $cleanup_days_default = 180;
+        $cleanup_days = max(30, min(3650, (int) $request->variable('cleanup_days', $cleanup_days_default)));
         add_form_key('adminhelper_unsubscribe_logs');
 
-        if ($request->is_set_post('delete_logs_all') || $request->is_set_post('delete_logs_selected'))
+        if ($request->is_set_post('cleanup_old_notifications') || $request->is_set_post('delete_logs_all') || $request->is_set_post('delete_logs_selected'))
         {
             if (!check_form_key('adminhelper_unsubscribe_logs'))
             {
                 trigger_error($user->lang('FORM_INVALID') . adm_back_link($this->u_action), E_USER_WARNING);
+            }
+
+            if ($request->is_set_post('cleanup_old_notifications'))
+            {
+                $cleanup_cutoff = time() - ($cleanup_days * 86400);
+
+                $sql = 'DELETE FROM ' . NOTIFICATIONS_TABLE . '
+                    WHERE notification_read = 0
+                        AND notification_time < ' . (int) $cleanup_cutoff;
+                $db->sql_query($sql);
+                $deleted_notifications = (int) $db->sql_affectedrows();
+
+                trigger_error($user->lang('ACP_ADMINHELPER_NOTIF_CLEANUP_SUCCESS', $deleted_notifications, $cleanup_days) . adm_back_link($this->u_action));
             }
 
             if ($request->is_set_post('delete_logs_all'))
@@ -192,6 +207,15 @@ class main_module
         $total_logs = (int) $db->sql_fetchfield('total_logs');
         $db->sql_freeresult($result);
 
+        $cleanup_cutoff = time() - ($cleanup_days * 86400);
+        $sql = 'SELECT COUNT(notification_id) AS old_unread_notifications
+            FROM ' . NOTIFICATIONS_TABLE . '
+            WHERE notification_read = 0
+                AND notification_time < ' . (int) $cleanup_cutoff;
+        $result = $db->sql_query($sql);
+        $old_unread_notifications = (int) $db->sql_fetchfield('old_unread_notifications');
+        $db->sql_freeresult($result);
+
         $sql = 'SELECT log_id, user_id, user_email, unsubscribe_type, token_expires_at, http_status, event_status,
                        request_method, request_ip, request_user_agent, logged_at
             FROM ' . $log_table . '
@@ -239,11 +263,13 @@ class main_module
         $template->assign_vars([
             'U_ACTION' => $this->u_action,
             'START' => $start,
+            'CLEANUP_DAYS' => $cleanup_days,
             'TOTAL_MEMBERS_COUNTED' => $total_members,
             'MASSMAIL_SUBSCRIBED' => $massmail_subscribed,
             'MASSMAIL_UNSUBSCRIBED' => $massmail_unsubscribed,
             'FORUM_NOTIFY_SUBSCRIBED' => $forum_notify_subscribed,
             'FORUM_NOTIFY_UNSUBSCRIBED' => $forum_notify_unsubscribed,
+            'OLD_UNREAD_NOTIFICATIONS' => $old_unread_notifications,
             'TOTAL_LOGS' => $total_logs,
             'PAGINATION' => '',
             'S_ON_PAGE' => $pagination->on_page($total_logs, $per_page, $start),

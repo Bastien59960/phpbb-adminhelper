@@ -33,6 +33,21 @@
 </fieldset>
 
 <form id="acp_adminhelper_logs" method="post" action="{{ U_ACTION|e('html_attr') }}">
+<fieldset>
+    <legend>{L_ACP_ADMINHELPER_NOTIF_CLEANUP_TITLE}</legend>
+    <dl>
+        <dt><label>{L_ACP_ADMINHELPER_NOTIF_CLEANUP_COUNT}:</label></dt>
+        <dd><strong>{{ OLD_UNREAD_NOTIFICATIONS }}</strong></dd>
+    </dl>
+    <dl>
+        <dt><label for="cleanup_days">{L_ACP_ADMINHELPER_NOTIF_CLEANUP_DAYS}:</label></dt>
+        <dd><input type="number" min="30" max="3650" name="cleanup_days" id="cleanup_days" value="{{ CLEANUP_DAYS|e('html_attr') }}" /></dd>
+    </dl>
+    <p class="submit-buttons">
+        <input type="submit" name="cleanup_old_notifications" class="button2" value="{L_ACP_ADMINHELPER_NOTIF_CLEANUP_ACTION}" onclick="return confirm('{L_ACP_ADMINHELPER_NOTIF_CLEANUP_CONFIRM|e('js')}');" />
+    </p>
+</fieldset>
+
 <table class="table1">
     <thead>
         <tr>
