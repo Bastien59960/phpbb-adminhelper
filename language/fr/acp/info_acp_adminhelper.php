@@ -61,8 +61,10 @@ $lang = array_merge($lang, [
     'ACP_ADMINHELPER_STATUS_EXPIRED_TOKEN' => 'Token expire',
     'ACP_ADMINHELPER_STATUS_UNSUBSCRIBED' => 'Desinscription confirmee',
     'ACP_ADMINHELPER_STATUS_ALREADY_UNSUBSCRIBED' => 'Deja desinscrit',
+    'ACP_ADMINHELPER_STATUS_MANUAL_UNSUBSCRIBED' => 'Desinscription manuelle',
     'ACP_ADMINHELPER_STATUS_CONFIRMATION_PAGE' => 'Page de confirmation affichee',
     'ACP_ADMINHELPER_STATUS_ADMIN_RESTORED' => 'Notifications reactivees par admin',
     'ACP_ADMINHELPER_TYPE_MASSMAIL' => 'Emails de masse',
     'ACP_ADMINHELPER_TYPE_FORUM_NOTIFY' => 'Notifications forum',
+    'ACP_ADMINHELPER_TYPE_REACTIONS_NOTIFY' => 'Notifications reactions',
 ]);
