@@ -1,4 +1,16 @@
 services:
+    # Surcharge du cron_runner_listener phpBB core pour garantir la libération
+    # du cron_lock (DB) via try-finally même si run() lève une exception.
+    # Remplace le service core 'cron.event_listener' (phpbb\cron\event\cron_runner_listener).
+    cron.event_listener:
+        class: bastien59960\adminhelper\cron\safe_cron_runner_listener
+        arguments:
+            - '@cron.lock_db'
+            - '@cron.manager'
+            - '@request'
+        tags:
+            - { name: kernel.event_subscriber }
+
     bastien59960.adminhelper.listener:
         class: bastien59960\adminhelper\event\listener
         arguments:
