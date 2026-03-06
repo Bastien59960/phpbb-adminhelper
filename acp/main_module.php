@@ -216,10 +216,12 @@ class main_module
         $old_unread_notifications = (int) $db->sql_fetchfield('old_unread_notifications');
         $db->sql_freeresult($result);
 
-        $sql = 'SELECT log_id, user_id, user_email, unsubscribe_type, token_expires_at, http_status, event_status,
-                       request_method, request_ip, request_user_agent, logged_at
-            FROM ' . $log_table . '
-            ORDER BY log_id DESC';
+        $sql = 'SELECT l.log_id, l.user_id, l.user_email, l.unsubscribe_type, l.token_expires_at, l.http_status, l.event_status,
+                       l.request_method, l.request_ip, l.request_user_agent, l.logged_at, u.username
+            FROM ' . $log_table . ' l
+            LEFT JOIN ' . USERS_TABLE . ' u
+                ON u.user_id = l.user_id
+            ORDER BY l.log_id DESC';
         $result = $db->sql_query_limit($sql, $per_page, $start);
 
         while ($row = $db->sql_fetchrow($result))
@@ -230,6 +232,12 @@ class main_module
             $type_key = 'ACP_ADMINHELPER_TYPE_' . strtoupper($unsubscribe_type);
             $type_label = isset($user->lang[$type_key]) ? $user->lang($type_key) : $unsubscribe_type;
             $user_id = (int) $row['user_id'];
+            $username = trim((string) ($row['username'] ?? ''));
+            $user_label = '-';
+            if ($user_id > 0)
+            {
+                $user_label = $username !== '' ? ($username . ':' . $user_id) : (string) $user_id;
+            }
             $request_user_agent = trim((string) $row['request_user_agent']);
 
             $template->assign_block_vars('logs', [
@@ -237,7 +245,8 @@ class main_module
                 'LOGGED_AT' => ((int) $row['logged_at'] > 0) ? $user->format_date((int) $row['logged_at']) : '-',
                 'TYPE_LABEL' => $type_label,
                 'STATUS_LABEL' => $status_label,
-                'USER_ID' => $user_id > 0 ? $user_id : '-',
+                'USER_LABEL' => $user_label,
+                'USER_ID' => $user_label,
                 'U_USER_PROFILE' => $user_id > 0 ? append_sid("{$phpbb_root_path}memberlist.$phpEx", 'mode=viewprofile&u=' . $user_id) : '',
                 'USER_EMAIL' => (string) $row['user_email'] !== '' ? (string) $row['user_email'] : '-',
                 'HTTP_STATUS' => (int) $row['http_status'] > 0 ? (int) $row['http_status'] : '-',

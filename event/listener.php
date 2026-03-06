@@ -60,7 +60,89 @@ class listener implements EventSubscriberInterface
             'core.notification_message_email'  => 'notification_message_email',
             'core.notification_message_process' => 'notification_message_process',
             'core.modify_email_headers'        => 'modify_email_headers',
+            'core.ucp_prefs_personal_update_data' => 'ucp_prefs_personal_update_data',
+            'core.ucp_prefs_post_update_data'  => 'ucp_prefs_post_update_data',
         ];
+    }
+
+    /**
+     * Track manual unsubscribe actions performed from UCP personal preferences.
+     */
+    public function ucp_prefs_personal_update_data($event)
+    {
+        global $user;
+
+        if (!isset($user->data['user_id']) || (int) $user->data['user_id'] <= ANONYMOUS)
+        {
+            return;
+        }
+
+        $sql_ary = isset($event['sql_ary']) && is_array($event['sql_ary']) ? $event['sql_ary'] : [];
+        $user_id = (int) $user->data['user_id'];
+        $user_email = (string) ($user->data['user_email'] ?? '');
+
+        $old_massmail = (int) ($user->data['user_allow_massemail'] ?? 0);
+        $new_massmail = isset($sql_ary['user_allow_massemail']) ? (int) $sql_ary['user_allow_massemail'] : $old_massmail;
+        if ($old_massmail === 1 && $new_massmail === 0)
+        {
+            $this->log_unsubscribe_event('manual_unsubscribed', 200, [
+                'user_id' => $user_id,
+                'user_email' => $user_email,
+                'unsubscribe_type' => 'massmail',
+                'token_expires_at' => 0,
+            ]);
+        }
+
+        $old_notify_enabled = (int) ($user->data['user_notify'] ?? 0) === 1;
+        $old_notify_type = (int) ($user->data['user_notify_type'] ?? NOTIFY_EMAIL);
+        $new_notify_type = isset($sql_ary['user_notify_type']) ? (int) $sql_ary['user_notify_type'] : $old_notify_type;
+        $old_email_enabled = in_array($old_notify_type, [NOTIFY_EMAIL, NOTIFY_BOTH], true);
+        $new_email_enabled = in_array($new_notify_type, [NOTIFY_EMAIL, NOTIFY_BOTH], true);
+
+        if ($old_notify_enabled && $old_email_enabled && !$new_email_enabled)
+        {
+            $this->log_unsubscribe_event('manual_unsubscribed', 200, [
+                'user_id' => $user_id,
+                'user_email' => $user_email,
+                'unsubscribe_type' => 'forum_notify',
+                'token_expires_at' => 0,
+            ]);
+        }
+    }
+
+    /**
+     * Track manual unsubscribe actions from UCP posting preferences.
+     */
+    public function ucp_prefs_post_update_data($event)
+    {
+        global $user;
+
+        if (!isset($user->data['user_id']) || (int) $user->data['user_id'] <= ANONYMOUS)
+        {
+            return;
+        }
+
+        $sql_ary = isset($event['sql_ary']) && is_array($event['sql_ary']) ? $event['sql_ary'] : [];
+        if (!isset($sql_ary['user_notify']))
+        {
+            return;
+        }
+
+        $old_notify = (int) ($user->data['user_notify'] ?? 0);
+        $new_notify = (int) $sql_ary['user_notify'];
+        $old_notify_type = (int) ($user->data['user_notify_type'] ?? NOTIFY_EMAIL);
+        $old_email_enabled = in_array($old_notify_type, [NOTIFY_EMAIL, NOTIFY_BOTH], true);
+        if (!($old_notify === 1 && $new_notify === 0 && $old_email_enabled))
+        {
+            return;
+        }
+
+        $this->log_unsubscribe_event('manual_unsubscribed', 200, [
+            'user_id' => (int) $user->data['user_id'],
+            'user_email' => (string) ($user->data['user_email'] ?? ''),
+            'unsubscribe_type' => 'forum_notify',
+            'token_expires_at' => 0,
+        ]);
     }
 
     /**

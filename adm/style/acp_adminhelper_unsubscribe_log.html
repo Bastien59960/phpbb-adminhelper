@@ -81,9 +81,9 @@
                 <td>{{ log.STATUS_LABEL|e }}</td>
                 <td>
                     {% if log.U_USER_PROFILE %}
-                        <a href="{{ log.U_USER_PROFILE|raw }}">{{ log.USER_ID|e }}</a>
+                        <a href="{{ log.U_USER_PROFILE|raw }}">{{ log.USER_LABEL|e }}</a>
                     {% else %}
-                        {{ log.USER_ID|e }}
+                        {{ log.USER_LABEL|e }}
                     {% endif %}
                 </td>
                 <td><code>{{ log.USER_EMAIL|e }}</code></td>

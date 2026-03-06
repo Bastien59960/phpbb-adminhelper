@@ -61,6 +61,7 @@ $lang = array_merge($lang, [
     'ACP_ADMINHELPER_STATUS_EXPIRED_TOKEN' => 'Token scaduto',
     'ACP_ADMINHELPER_STATUS_UNSUBSCRIBED' => 'Disiscrizione confermata',
     'ACP_ADMINHELPER_STATUS_ALREADY_UNSUBSCRIBED' => 'Gia disiscritto',
+    'ACP_ADMINHELPER_STATUS_MANUAL_UNSUBSCRIBED' => 'Disiscrizione manuale',
     'ACP_ADMINHELPER_STATUS_CONFIRMATION_PAGE' => 'Pagina conferma visualizzata',
     'ACP_ADMINHELPER_STATUS_ADMIN_RESTORED' => 'Notifiche ripristinate da admin',
     'ACP_ADMINHELPER_TYPE_MASSMAIL' => 'Email di massa',

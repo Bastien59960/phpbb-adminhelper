@@ -61,6 +61,7 @@ $lang = array_merge($lang, [
     'ACP_ADMINHELPER_STATUS_EXPIRED_TOKEN' => 'Token abgelaufen',
     'ACP_ADMINHELPER_STATUS_UNSUBSCRIBED' => 'Abmeldung bestaetigt',
     'ACP_ADMINHELPER_STATUS_ALREADY_UNSUBSCRIBED' => 'Bereits abgemeldet',
+    'ACP_ADMINHELPER_STATUS_MANUAL_UNSUBSCRIBED' => 'Manuelle Abmeldung',
     'ACP_ADMINHELPER_STATUS_CONFIRMATION_PAGE' => 'Bestaetigungsseite aufgerufen',
     'ACP_ADMINHELPER_STATUS_ADMIN_RESTORED' => 'Admin hat Benachrichtigungen wiederhergestellt',
     'ACP_ADMINHELPER_TYPE_MASSMAIL' => 'Massenmails',

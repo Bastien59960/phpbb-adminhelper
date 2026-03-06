@@ -1,86 +1,139 @@
-# Admin Helper - Extension phpBB
+# Bastien59960 Admin Helper - phpBB 3.3+ Extension
 
-Extension phpBB 3.3 pour administrer plus facilement les membres et les envois email, avec gestion de desinscription conforme RFC8058.
+[Français](README.fr.md)
 
-## Fonctions principales
+**Harden ACP email workflows and unsubscribe compliance.**
 
-### 1) Recherche membre par email dans l'ACP
+When admin-to-member communication quality matters, unsubscribe handling and auditability must be reliable. Bastien59960 Admin Helper extends phpBB ACP with practical tools for safer mass email operations, RFC 8058 one-click unsubscribe support, and operational unsubscribe logs.
 
-Dans `ACP > Membres et Groupes > Gerer les utilisateurs`, l'extension ajoute un champ de recherche par adresse email.
+## Why install it
 
-### 2) Emails de masse admin (ACP)
+- Search members by email directly from ACP user management.
+- Send cleaner mass emails with optional HTML + plain-text multipart.
+- Add compliant unsubscribe headers and links.
+- Track unsubscribe events with clear ACP logs and counters.
 
-Dans `ACP > General > Client communication > Email`:
+## Key features
 
-- Edition texte + HTML (multipart/alternative)
-- Ajout d'un footer de desinscription
-- En-tetes one-click:
+### ACP user management helper
+
+- Adds email-based member lookup in:
+  - `ACP > Users and Groups > Manage users`
+- Improves support/admin workflows when username is unknown.
+
+### Mass email hardening (ACP)
+
+In `ACP > General > Client communication > Email`:
+
+- Optional HTML email content with sanitized markup.
+- Automatic plain-text fallback generation when HTML is provided.
+- Optional unsubscribe footer insertion.
+- One-click mode can force recipient-specific queue-safe sending behavior.
+
+### One-click unsubscribe (RFC 8058)
+
+- Adds compliant headers when enabled:
   - `List-Unsubscribe`
   - `List-Unsubscribe-Post: List-Unsubscribe=One-Click`
-- Envoi unitaire pour one-click (chunk size force a 1)
-- Throttle anti-burst `500ms` entre messages dans le process queue
+- Generates signed, expiring unsubscribe links.
+- Supports distinct unsubscribe scopes:
+  - `massmail`
+  - `forum_notify`
 
-### 3) Desinscription distincte par type
+### Unsubscribe request handling
 
-Le token de desinscription prend en charge deux types :
+- Intercepts signed unsubscribe requests on forum entrypoint.
+- Provides confirmation page (`GET`) and one-click action (`POST`).
+- Verifies signature, expiry, and user mapping before applying changes.
+- Uses explicit HTTP status handling (`200`, `400`, `403`, `410`).
 
-- `massmail`: desinscription des emails de masse administrateur
-- `forum_notify`: desinscription des notifications email forum
+### ACP unsubscribe logs and counters
 
-Chaque type a son propre traitement, son propre texte de confirmation, et son propre logging.
+In `ACP > Extensions > Admin Helper > Unsubscribe logs`:
 
-### 4) Logs ACP + compteurs globaux
+- Global counters for massmail and forum notification subscription states.
+- Detailed event log:
+  - date, type, status, member, email, HTTP code, method, IP, token expiry, user-agent
+- Tracks manual unsubscribe actions from UCP preference changes.
+- Admin action to restore forum email notifications for a member.
+- Cleanup action for old unread notifications.
 
-Nouvelle page ACP:
+## Requirements
 
-- `ACP > Extensions > Admin Helper > Logs desinscription`
+- PHP `>= 7.1.3`
+- phpBB `>= 3.3.0`
 
-Elle affiche:
+## Installation
 
-- Compteurs globaux:
-  - Membres inscrits/desinscrits emails de masse
-  - Membres inscrits/desinscrits notifications forum (email)
-- Journal detaille:
-  - date, type, statut, user, email, HTTP, methode, IP, expiration token, user-agent
+1. Copy `bastien59960/adminhelper` into `ext/`.
+2. Enable the extension:
 
-### 5) Action admin "Annuler" (restauration)
+```bash
+php bin/phpbbcli.php extension:enable bastien59960/adminhelper
+```
 
-Sur les lignes de log `forum_notify`, un bouton ACP permet de re-activer les notifications email pour un membre qui s'est trompe.
+## Update
 
-Effets de l'action:
-
-- remet `user_notify = 1`
-- convertit `user_notify_type` `IM -> BOTH` si necessaire
-- remet `notify = 1` dans `user_notifications` pour `notification.method.email`
-- ecrit un event de log `admin_restored`
-
-## Schema et migrations
-
-- `release_1_0_1`: creation table `*_adminhelper_unsubscribe_log` + module ACP
-- `release_1_0_2`: ajout colonne `unsubscribe_type` (+ index)
-
-## Installation / mise a jour
-
-1. Copier `ext/bastien59960/adminhelper`
-2. Activer l'extension dans l'ACP
-3. Lancer les migrations:
+After updating files:
 
 ```bash
 php bin/phpbbcli.php db:migrate
 php bin/phpbbcli.php cache:purge
 ```
 
-## Compatibilite
+## Uninstall
 
-- phpBB `>= 3.3.0`
-- PHP `>= 7.1.3`
+```bash
+php bin/phpbbcli.php extension:disable bastien59960/adminhelper
+php bin/phpbbcli.php extension:purge bastien59960/adminhelper
+```
 
-## Langues
+## Quick ACP setup
 
-Clés de langue fournies pour:
+Recommended in **ACP > General > Client communication > Email**:
+
+- Enable unsubscribe footer.
+- Enable one-click unsubscribe headers.
+- Use queue sending for large recipient sets.
+- Use HTML mode only when needed and keep message content simple.
+
+Recommended in **ACP > Extensions > Admin Helper > Unsubscribe logs**:
+
+- Verify counters and recent event statuses.
+- Use restore action only for confirmed user requests.
+- Periodically clean old unread notifications if required by your policy.
+
+## Stored data (summary)
+
+Main AdminHelper table:
+
+- `adminhelper_unsubscribe_log`
+  - `user_id`, `user_email`, `unsubscribe_type`, `token_expires_at`
+  - `http_status`, `event_status`, `request_method`, `request_ip`, `request_user_agent`, `logged_at`
+
+## Security and privacy
+
+- Unsubscribe signatures are HMAC-based and time-bounded.
+- Invalid/abusive unsubscribe attempts are rate-limited in logs.
+- Email sending must not be blocked by header/formatting errors (fail-open behavior).
+- No external API tokens are required for core functionality.
+
+## Known limits
+
+- One-click behavior depends on recipient provider support for RFC 8058 headers.
+- High-volume sends may be slower when one-click recipient-specific mode is enabled.
+- The extension updates phpBB preferences; it does not manage third-party suppression lists.
+
+## Language coverage
+
+Language files are provided for:
 
 - `fr`, `en`, `de`, `es`, `it`
 
-## Licence
+## License
 
-GPL-2.0-only
+[GPL-2.0-only](LICENSE)
+
+## Author
+
+**Bastien** (`bastien59960`)
