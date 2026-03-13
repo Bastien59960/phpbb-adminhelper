@@ -22,6 +22,7 @@ class listener implements EventSubscriberInterface
     protected $current_unsubscribe_type;
     protected $notification_email_context;
     protected $recipient_user_cache;
+    protected $ucp_notify_unsub_logged;
 
     public function __construct(
         \phpbb\db\driver\driver_interface $db,
@@ -46,6 +47,7 @@ class listener implements EventSubscriberInterface
         $this->current_unsubscribe_type = '';
         $this->notification_email_context = false;
         $this->recipient_user_cache = [];
+        $this->ucp_notify_unsub_logged = false;
     }
 
     public static function getSubscribedEvents()
@@ -62,6 +64,7 @@ class listener implements EventSubscriberInterface
             'core.modify_email_headers'        => 'modify_email_headers',
             'core.ucp_prefs_personal_update_data' => 'ucp_prefs_personal_update_data',
             'core.ucp_prefs_post_update_data'  => 'ucp_prefs_post_update_data',
+            'core.ucp_notifications_submit_notification_is_set' => 'ucp_notifications_submit_notification_is_set',
         ];
     }
 
@@ -140,6 +143,48 @@ class listener implements EventSubscriberInterface
         $this->log_unsubscribe_event('manual_unsubscribed', 200, [
             'user_id' => (int) $user->data['user_id'],
             'user_email' => (string) ($user->data['user_email'] ?? ''),
+            'unsubscribe_type' => 'forum_notify',
+            'token_expires_at' => 0,
+        ]);
+    }
+
+    /**
+     * Log when a user disables email notifications via the UCP notification options page.
+     * Fires once per notification method entry — we only care about the email method
+     * and only log once per form submission (flag prevents duplicate rows).
+     */
+    public function ucp_notifications_submit_notification_is_set($event)
+    {
+        if ($this->ucp_notify_unsub_logged)
+        {
+            return;
+        }
+
+        global $user;
+
+        if (!isset($user->data['user_id']) || (int) $user->data['user_id'] <= ANONYMOUS)
+        {
+            return;
+        }
+
+        $method_data  = isset($event['method_data'])  && is_array($event['method_data'])  ? $event['method_data']  : [];
+        $is_set_notify = isset($event['is_set_notify']) ? (bool) $event['is_set_notify'] : true;
+
+        if (($method_data['id'] ?? '') !== 'notification.method.email')
+        {
+            return;
+        }
+
+        if ($is_set_notify)
+        {
+            return;
+        }
+
+        $this->ucp_notify_unsub_logged = true;
+
+        $this->log_unsubscribe_event('ucp_notify_options_updated', 200, [
+            'user_id'          => (int) $user->data['user_id'],
+            'user_email'       => (string) ($user->data['user_email'] ?? ''),
             'unsubscribe_type' => 'forum_notify',
             'token_expires_at' => 0,
         ]);

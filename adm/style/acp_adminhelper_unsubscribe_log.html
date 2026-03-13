@@ -28,6 +28,56 @@
 </fieldset>
 
 <fieldset>
+    <legend>{L_ACP_ADMINHELPER_REACTIONS_EMAIL_STATS}</legend>
+    <dl>
+        <dt><label>{L_ACP_ADMINHELPER_REACTIONS_EMAIL_SENT}:</label></dt>
+        <dd><strong>{{ REACTIONS_EMAIL_SENT }}</strong></dd>
+    </dl>
+    <dl>
+        <dt><label>{L_ACP_ADMINHELPER_REACTIONS_EMAIL_SKIPPED}:</label></dt>
+        <dd><strong>{{ REACTIONS_EMAIL_SKIPPED }}</strong></dd>
+    </dl>
+    <dl>
+        <dt><label>{L_ACP_ADMINHELPER_REACTIONS_EMAIL_FAILED}:</label></dt>
+        <dd><strong style="{% if REACTIONS_EMAIL_FAILED > 0 %}color:#c00;{% endif %}">{{ REACTIONS_EMAIL_FAILED }}</strong></dd>
+    </dl>
+    <dl>
+        <dt><label>{L_ACP_ADMINHELPER_REACTIONS_EMAIL_LEGACY}:</label></dt>
+        <dd><strong>{{ REACTIONS_EMAIL_LEGACY }}</strong></dd>
+    </dl>
+</fieldset>
+
+{% if UNLOGGED_UNSUB_COUNT > 0 %}
+<fieldset>
+    <legend>{L_ACP_ADMINHELPER_UNLOGGED_UNSUB_TITLE} ({{ UNLOGGED_UNSUB_COUNT }})</legend>
+    <p>{L_ACP_ADMINHELPER_UNLOGGED_UNSUB_EXPLAIN}</p>
+    <table class="table1">
+        <thead>
+            <tr>
+                <th>{L_ACP_ADMINHELPER_LOG_COL_USER}</th>
+                <th>{L_ACP_ADMINHELPER_LOG_COL_EMAIL}</th>
+                <th>{L_ACP_ADMINHELPER_LOG_COL_ACTIONS}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in unlogged_unsub %}
+            <tr class="{% if loop.index is odd %}row1{% else %}row2{% endif %}">
+                <td><a href="{{ m.U_USER_PROFILE|raw }}">{{ m.USERNAME|e }}</a></td>
+                <td><code>{{ m.USER_EMAIL|e }}</code></td>
+                <td>
+                    <a href="{{ m.U_RESTORE_NOTIFY|raw }}" class="button2"
+                        onclick="return confirm('{{ m.RESTORE_NOTIFY_CONFIRM|e('js') }}');">
+                        {L_ACP_ADMINHELPER_ACTION_RESTORE_NOTIFY}
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</fieldset>
+{% endif %}
+
+<fieldset>
     <legend>{L_ACP_ADMINHELPER_LOG_TOTAL}</legend>
     <p><strong>{{ TOTAL_LOGS }}</strong></p>
 </fieldset>
@@ -46,6 +96,49 @@
             <input type="submit" name="refresh_cleanup_preview" class="button2" value="{L_ACP_ADMINHELPER_NOTIF_CLEANUP_REFRESH}" />
         </dd>
     </dl>
+
+    {% if notif_types or REACTIONS_PENDING_COUNT > 0 %}
+    <table class="table1" style="margin-top:10px;">
+        <thead>
+            <tr>
+                <th>{L_ACP_ADMINHELPER_NOTIF_COL_TYPE}</th>
+                <th>{L_ACP_ADMINHELPER_NOTIF_COL_COUNT}</th>
+                <th>{L_ACP_ADMINHELPER_NOTIF_COL_OLDEST}</th>
+                <th>{L_ACP_ADMINHELPER_NOTIF_COL_ACTION}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for nt in notif_types %}
+            <tr class="{% if loop.index is odd %}row1{% else %}row2{% endif %}">
+                <td><code>{{ nt.TYPE_NAME|e }}</code></td>
+                <td><strong>{{ nt.COUNT|e }}</strong></td>
+                <td>{{ nt.OLDEST|e }}</td>
+                <td>
+                    <button type="submit" name="cleanup_notif_by_type" class="button2"
+                        onclick="document.getElementById('notif_type_name_input').value='{{ nt.TYPE_NAME|e('js') }}'; return confirm('{L_ACP_ADMINHELPER_NOTIF_CLEANUP_TYPE_CONFIRM|e('js')}'.replace('%s', '{{ nt.TYPE_NAME|e('js') }}'));">
+                        {L_ACP_ADMINHELPER_NOTIF_DELETE_TYPE}
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if REACTIONS_PENDING_COUNT > 0 %}
+            <tr class="{% if notif_types|length is odd %}row1{% else %}row2{% endif %}">
+                <td><code>reactions_email_pending</code></td>
+                <td><strong>{{ REACTIONS_PENDING_COUNT|e }}</strong></td>
+                <td>{{ REACTIONS_PENDING_OLDEST|e }}</td>
+                <td>
+                    <button type="submit" name="cleanup_notif_by_type" class="button2"
+                        onclick="document.getElementById('notif_type_name_input').value='__reactions_email__'; return confirm('{L_ACP_ADMINHELPER_NOTIF_REACTIONS_SKIP_CONFIRM|e('js')}');">
+                        {L_ACP_ADMINHELPER_NOTIF_REACTIONS_SKIP}
+                    </button>
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+    <input type="hidden" id="notif_type_name_input" name="notif_type_name" value="" />
+    {% endif %}
+
     <p class="submit-buttons">
         <input type="submit" name="cleanup_old_notifications" class="button2" value="{L_ACP_ADMINHELPER_NOTIF_CLEANUP_ACTION}" onclick="return confirm('{L_ACP_ADMINHELPER_NOTIF_CLEANUP_CONFIRM|e('js')}');" />
     </p>
