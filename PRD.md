@@ -2,13 +2,13 @@
 
 **Dernière mise à jour :** 2026-03-15
 **Extension :** `ext/bastien59960/adminhelper`
-**Version courante :** 1.0.2
+**Version courante :** 1.0.3 (en développement)
 
 ---
 
 ## Objectif
 
-Extension de confort pour l'administration du forum : durcissement des emails de masse, conformité RFC 8058 désinscription, logs d'audit, correctif du cron_lock phpBB, et amélioration de la recherche de posts par auteur.
+Extension de confort pour l'administration du forum : durcissement des emails de masse, conformité RFC 8058 désinscription, logs d'audit, correctif du cron_lock phpBB, amélioration de la recherche de posts par auteur, et notes de modération sur les posts.
 
 ---
 
@@ -100,12 +100,69 @@ Fix : stocker les lignes brutes DB des PJ dans une propriété listener lors de 
 
 ---
 
+### 7. Notes de modération sur les posts (2026-03-15)
+
+Fonctionnalité réservée aux modérateurs et administrateurs permettant d'attacher une note interne à n'importe quel post du forum. Ces notes sont invisibles des membres ordinaires.
+
+#### 7a. Icône dans la barre d'actions du post
+
+Un bouton SVG "bloc-notes + crayon" s'ajoute à la barre `Éditer / Supprimer / Rapporter / Avertir / Info / Citer`, visible uniquement si l'utilisateur a le droit `m_edit` sur le forum du post (ou `a_` global admin). Cliquer dessus affiche/masque un éditeur inline (textarea + bouton Enregistrer).
+
+Le bouton "note de modération" est entouré d'un **bord rouge 2 px** (signal de danger). L'icône "Éditer le post" (fa-pencil, souvent confondue avec "Citer") reçoit le même traitement.
+
+#### 7b. Affichage de la note existante
+
+Si une note existe sur un post, une zone `adminhelper-mod-note-box` s'affiche en bas du post (sous la signature), visible uniquement aux modérateurs/admins. Elle contient :
+- le texte de la note,
+- l'auteur de la note et la date,
+- un bouton "Supprimer la note" (POST sécurisé avec form key).
+
+Un seul note par post (UNIQUE sur `post_id`). L'enregistrement d'une nouvelle note remplace l'existante.
+
+#### 7c. Page "Consulter les posts à modérer"
+
+Accessible via le **menu Accès rapide** (dropdown "hamburger") — sous l'entrée "Brouillons" ajoutée par geoexplo. Lien visible uniquement si `ADMINHELPER_IS_MOD_OR_ADMIN = true` (injecté en `core.page_header`).
+
+Page listée à `/app.php/adminhelper/mod-notes` :
+- Tableau de tous les posts ayant une note : date note, auteur note, titre post, auteur post, forum, extrait de note, lien direct, bouton "Supprimer".
+- Accessible uniquement aux modérateurs/admins (vérification `$auth->acl_getf_global('m_edit')` ou admin).
+
+#### 7d. Sécurité
+
+- Contrôle d'accès : `$auth->acl_get('m_edit', $forum_id)` pour chaque action sur un post.
+- CSRF : formulaires protégés par `add_form_key()` / `check_form_key()` phpBB.
+- Suppression : vérification que la note appartient bien au forum sur lequel l'utilisateur est modérateur.
+
+**Table :** `phpbb3_adminhelper_mod_notes`
+```
+note_id       UINT AUTO_INCREMENT PK
+post_id       UINT NOT NULL UNIQUE
+forum_id      UINT NOT NULL
+note_text     TEXT NOT NULL
+note_author_id UINT NOT NULL
+note_created  UINT NOT NULL
+```
+
+**Nouveaux événements phpBB :**
+- `core.page_header` → injection de `ADMINHELPER_IS_MOD_OR_ADMIN`
+- `core.viewtopic_post_row_after` → chargement de la note du post, injection via `alter_block_array`
+
+**Nouveaux fichiers template :**
+- `event/viewtopic_body_post_buttons_after.html` — bouton icône note
+- `event/viewtopic_body_postrow_post_content_footer.html` — affichage note + formulaire éditeur
+- `event/navbar_header_quick_links_after.html` — lien "Posts à modérer"
+- `event/overall_header_head_append.html` — CSS global (bords rouges + styles note)
+- `adminhelper_mod_notes.html` — page liste complète
+
+---
+
 ## Migrations
 
 | Fichier | Contenu |
 |---|---|
 | `release_1_0_1.php` | Table `adminhelper_unsubscribe_log`, configs, module ACP |
 | `release_1_0_2.php` | Compteurs UCP, stats emails réactions |
+| `release_1_0_3.php` | Table `adminhelper_mod_notes` (notes de modération) |
 
 Aucune migration n'est nécessaire pour la fonctionnalité de recherche (2026-03-15) : tout est traité en PHP/template, sans schéma DB supplémentaire.
 
@@ -113,7 +170,7 @@ Aucune migration n'est nécessaire pour la fonctionnalité de recherche (2026-03
 
 ## Dépendances internes
 
-- Utilise les événements phpBB : `core.common`, `core.search_modify_rowset`, `core.search_modify_tpl_ary`, `core.acp_users_modify_sql_query`, `core.submit_post_modify_sql_data`.
+- Utilise les événements phpBB : `core.common`, `core.page_header`, `core.search_modify_rowset`, `core.search_modify_tpl_ary`, `core.acp_users_modify_sql_query`, `core.submit_post_modify_sql_data`, `core.viewtopic_post_row_after`.
 - Surcharge du service `cron.event_listener` pour le correctif lock.
 - Pas de dépendance externe (pas d'API tierce).
 
@@ -125,10 +182,19 @@ Aucune migration n'est nécessaire pour la fonctionnalité de recherche (2026-03
 event/listener.php                          — abonnements événements phpBB
 event/safe_cron_runner_listener.php         — surcharge cron lock fix
 acp/main_module.php                         — contrôleur ACP logs désinscriptions
+controller/mod_notes_controller.php         — CRUD notes + page liste (v1.0.3)
 migrations/release_1_0_1.php               — schéma initial
 migrations/release_1_0_2.php               — stats UCP
+migrations/release_1_0_3.php               — table adminhelper_mod_notes
 tools/cron_watchdog.sh                      — watchdog lock orphelins
+config/routing.yml                          — routes controller mod_notes
 styles/prosilver/template/event/
-  search_results_header_before.html         — CSS injection
+  search_results_header_before.html         — CSS injection (search)
   search_results_content_after.html         — PJ non-inline rendu
+  overall_header_head_append.html           — CSS global mod-notes + bords danger
+  viewtopic_body_post_buttons_after.html    — bouton icône note modération
+  viewtopic_body_postrow_post_content_footer.html — affichage note + éditeur
+  navbar_header_quick_links_after.html      — lien "Posts à modérer" (mods only)
+styles/prosilver/template/
+  adminhelper_mod_notes.html               — page liste tous les posts avec note
 ```
