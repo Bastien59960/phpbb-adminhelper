@@ -1832,9 +1832,11 @@ class listener implements EventSubscriberInterface
         $note_by = '';
         if ($note)
         {
+            // Échapper le pseudo : autoescape Twig est OFF dans phpBB 3.3
+            $safe_author = htmlspecialchars($note['note_author'], ENT_QUOTES, 'UTF-8');
             $note_by = $this->language->lang(
                 'ADMINHELPER_MOD_NOTE_BY',
-                $note['note_author'],
+                $safe_author,
                 $this->user->format_date((int) $note['note_created'])
             );
         }
@@ -1842,7 +1844,8 @@ class listener implements EventSubscriberInterface
         $this->template->alter_block_array('postrow', [
             'ADMINHELPER_CAN_MOD_NOTE'  => true,
             'ADMINHELPER_HAS_NOTE'      => !empty($note),
-            'ADMINHELPER_NOTE_TEXT'     => $note ? $note['note_text'] : '',
+            // Échapper le texte de la note (XSS stocké — autoescape OFF dans phpBB 3.3)
+            'ADMINHELPER_NOTE_TEXT'     => $note ? htmlspecialchars($note['note_text'], ENT_QUOTES, 'UTF-8') : '',
             'ADMINHELPER_NOTE_BY'       => $note_by,
             'ADMINHELPER_NOTE_ID'       => $note ? (int) $note['note_id'] : 0,
             'ADMINHELPER_U_SAVE_NOTE'   => $u_save,

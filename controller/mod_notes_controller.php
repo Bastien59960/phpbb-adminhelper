@@ -62,7 +62,8 @@ class mod_notes_controller
 		}
 
 		$post_id   = $this->request->variable('post_id', 0);
-		$note_text = trim($this->request->variable('note_text', '', true));
+		// Limiter la longueur : colonne TEXT = 65535 octets, on borne à 4000 caractères
+		$note_text = mb_substr(trim($this->request->variable('note_text', '', true)), 0, 4000);
 
 		if ($post_id <= 0)
 		{
@@ -188,15 +189,16 @@ class mod_notes_controller
 			$u_post = append_sid(generate_board_url() . '/viewtopic.php', 'p=' . (int) $row['post_id']) . '#p' . (int) $row['post_id'];
 			$u_delete = $this->helper->route('adminhelper_mod_notes_delete', ['note_id' => (int) $row['note_id']]);
 
+			// Échapper toutes les données venant de la DB — autoescape Twig est OFF dans phpBB 3.3
 			$this->template->assign_block_vars('mod_notes', [
 				'NOTE_ID'      => (int) $row['note_id'],
 				'NOTE_DATE'    => $this->user->format_date((int) $row['note_created']),
-				'NOTE_AUTHOR'  => $row['note_author'] ?: '—',
-				'NOTE_TEXT'    => $row['note_text'],
+				'NOTE_AUTHOR'  => htmlspecialchars($row['note_author'] ?: '—', ENT_QUOTES, 'UTF-8'),
+				'NOTE_TEXT'    => htmlspecialchars($row['note_text'], ENT_QUOTES, 'UTF-8'),
 				'POST_ID'      => (int) $row['post_id'],
-				'POST_SUBJECT' => $post_subject,
-				'POST_AUTHOR'  => $row['poster_name'],
-				'FORUM_NAME'   => $row['forum_name'],
+				'POST_SUBJECT' => htmlspecialchars($post_subject, ENT_QUOTES, 'UTF-8'),
+				'POST_AUTHOR'  => htmlspecialchars($row['poster_name'], ENT_QUOTES, 'UTF-8'),
+				'FORUM_NAME'   => htmlspecialchars($row['forum_name'], ENT_QUOTES, 'UTF-8'),
 				'U_POST'       => $u_post,
 				'U_DELETE'     => $u_delete,
 			]);
