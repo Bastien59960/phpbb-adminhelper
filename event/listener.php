@@ -12,6 +12,8 @@ class listener implements EventSubscriberInterface
     protected $language;
     protected $config;
     protected $language_loaded;
+    protected $search_is_author;
+    protected $search_post_attaches;
     protected $mass_email_context;
     protected $mass_email_append_unsubscribe;
     protected $mass_email_one_click_enabled;
@@ -37,6 +39,8 @@ class listener implements EventSubscriberInterface
         $this->language = $language;
         $this->config = $config;
         $this->language_loaded = false;
+        $this->search_is_author = false;
+        $this->search_post_attaches = [];
         $this->mass_email_context = false;
         $this->mass_email_append_unsubscribe = false;
         $this->mass_email_one_click_enabled = false;
@@ -65,6 +69,8 @@ class listener implements EventSubscriberInterface
             'core.ucp_prefs_personal_update_data' => 'ucp_prefs_personal_update_data',
             'core.ucp_prefs_post_update_data'  => 'ucp_prefs_post_update_data',
             'core.ucp_notifications_submit_notification_is_set' => 'ucp_notifications_submit_notification_is_set',
+            'core.search_modify_rowset'                        => 'on_search_author_rowset',
+            'core.search_modify_tpl_ary'                       => 'on_search_author_tpl_ary',
         ];
     }
 
@@ -1504,6 +1510,233 @@ class listener implements EventSubscriberInterface
         header('X-Robots-Tag: noindex, nofollow');
         echo $body;
         exit;
+    }
+
+    /**
+     * Recherche par auteur : prépare le rendu complet des posts et capture les PJ.
+     *
+     * Déclenché sur core.search_modify_rowset, avant que phpBB traite les PJ inline
+     * et tronque les textes. On :
+     *  1. Détecte si c'est une recherche sr=posts&author_id=N
+     *  2. Force display_text_only=false sur tous les posts (texte BBCode complet)
+     *  3. Re-fetch le BBCode original pour les posts déjà tronqués
+     *  4. Capture toutes les PJ brutes (DB rows) dans $this->search_post_attaches
+     *  5. Injecte dans $attachments les PJ des posts qui n'y étaient pas (car tronqués)
+     */
+    public function on_search_author_rowset($event)
+    {
+        $author_id = $this->request->variable('author_id', 0);
+        $sr        = $this->request->variable('sr', '');
+
+        if ($author_id <= 0 || $sr !== 'posts')
+        {
+            return;
+        }
+
+        $this->search_is_author = true;
+
+        $rowset      = $event['rowset'];
+        $attachments = $event['attachments'];
+
+        // Stocker les PJ déjà chargées par phpBB
+        foreach ($attachments as $post_id => $attach_rows)
+        {
+            $this->search_post_attaches[(int) $post_id] = $attach_rows;
+        }
+
+        // Trouver les posts tronqués (display_text_only=true → BBCode perdu)
+        $refetch_ids  = [];
+        $missing_pj   = [];
+
+        foreach ($rowset as $key => $row)
+        {
+            $post_id = (int) $row['post_id'];
+
+            if (!empty($row['display_text_only']))
+            {
+                $refetch_ids[$key] = $post_id;
+            }
+
+            if (!empty($row['post_attachment']) && !isset($this->search_post_attaches[$post_id]))
+            {
+                $missing_pj[] = $post_id;
+            }
+        }
+
+        // Re-fetch BBCode original pour les posts tronqués
+        if (!empty($refetch_ids))
+        {
+            $sql = 'SELECT post_id, post_text, bbcode_uid, bbcode_bitfield
+                    FROM ' . POSTS_TABLE . '
+                    WHERE ' . $this->db->sql_in_set('post_id', array_values($refetch_ids));
+            $result = $this->db->sql_query($sql);
+
+            $originals = [];
+            while ($orig = $this->db->sql_fetchrow($result))
+            {
+                $originals[(int) $orig['post_id']] = $orig;
+            }
+            $this->db->sql_freeresult($result);
+
+            foreach ($refetch_ids as $key => $post_id)
+            {
+                if (!empty($originals[$post_id]))
+                {
+                    $rowset[$key]['post_text']      = $originals[$post_id]['post_text'];
+                    $rowset[$key]['bbcode_uid']      = $originals[$post_id]['bbcode_uid'];
+                    $rowset[$key]['bbcode_bitfield'] = $originals[$post_id]['bbcode_bitfield'];
+                }
+                $rowset[$key]['display_text_only'] = false;
+            }
+        }
+
+        // Charger les PJ manquantes (posts qui étaient tronqués, donc absents de $attachments)
+        if (!empty($missing_pj))
+        {
+            $sql = 'SELECT *
+                    FROM ' . ATTACHMENTS_TABLE . '
+                    WHERE ' . $this->db->sql_in_set('post_msg_id', $missing_pj) . '
+                        AND is_orphan = 0
+                    ORDER BY filetime DESC, post_msg_id ASC';
+            $result = $this->db->sql_query($sql);
+
+            while ($attach = $this->db->sql_fetchrow($result))
+            {
+                $post_id = (int) $attach['post_msg_id'];
+                $this->search_post_attaches[$post_id][] = $attach;
+                $attachments[$post_id][]                = $attach;
+            }
+            $this->db->sql_freeresult($result);
+        }
+
+        $event['rowset']      = $rowset;
+        $event['attachments'] = $attachments;
+    }
+
+    /**
+     * Recherche par auteur : ajoute les PJ non-inline dans le tpl_ary de chaque post.
+     *
+     * Une PJ est "non-inline" si son attach_id n'apparaît pas dans le HTML rendu
+     * du MESSAGE (les inline ont été remplacées par des <img> ou liens contenant
+     * "id=N" dans l'URL download/file.php).
+     */
+    public function on_search_author_tpl_ary($event)
+    {
+        if (!$this->search_is_author || $event['show_results'] !== 'posts')
+        {
+            return;
+        }
+
+        global $phpbb_root_path, $phpEx;
+
+        $row     = $event['row'];
+        $post_id = (int) $row['post_id'];
+        $attaches = $this->search_post_attaches[$post_id] ?? [];
+
+        if (empty($attaches))
+        {
+            return;
+        }
+
+        $tpl_ary = $event['tpl_ary'];
+        $message = $tpl_ary['MESSAGE'] ?? '';
+
+        $html = '';
+        foreach ($attaches as $attach)
+        {
+            $attach_id = (int) $attach['attach_id'];
+
+            // Pièce jointe inline = son ID apparaît déjà dans l'URL du MESSAGE rendu
+            if (strpos($message, 'id=' . $attach_id) !== false)
+            {
+                continue;
+            }
+
+            $filename = htmlspecialchars($attach['real_filename'], ENT_QUOTES, 'UTF-8');
+            $filesize = $this->format_attach_filesize((int) $attach['filesize']);
+            $dl_url   = htmlspecialchars(
+                $phpbb_root_path . 'download/file.' . $phpEx . '?id=' . $attach_id,
+                ENT_QUOTES, 'UTF-8'
+            );
+
+            if (!empty($attach['thumbnail']))
+            {
+                $thumb_url = htmlspecialchars(
+                    $phpbb_root_path . 'download/file.' . $phpEx . '?id=' . $attach_id . '&amp;t=1',
+                    ENT_QUOTES, 'UTF-8'
+                );
+                $html .= '<div class="adminhelper-attach-item">'
+                    . '<a href="' . $dl_url . '" target="_blank">'
+                    . '<img src="' . $thumb_url . '" alt="' . $filename . '" class="adminhelper-attach-thumb">'
+                    . ' ' . $filename
+                    . '</a>'
+                    . ' <span class="adminhelper-attach-size">(' . $filesize . ')</span>'
+                    . '</div>';
+            }
+            elseif (strpos($attach['mimetype'], 'image/') === 0)
+            {
+                $html .= '<div class="adminhelper-attach-item">'
+                    . '<a href="' . $dl_url . '" target="_blank">'
+                    . '<img src="' . $dl_url . '" alt="' . $filename . '" class="adminhelper-attach-thumb">'
+                    . ' ' . $filename
+                    . '</a>'
+                    . ' <span class="adminhelper-attach-size">(' . $filesize . ')</span>'
+                    . '</div>';
+            }
+            else
+            {
+                $icon = $this->get_attach_fa_icon($attach['mimetype']);
+                $html .= '<div class="adminhelper-attach-item">'
+                    . '<i class="icon ' . $icon . ' fa-fw" aria-hidden="true"></i> '
+                    . '<a href="' . $dl_url . '" target="_blank">' . $filename . '</a>'
+                    . ' <span class="adminhelper-attach-size">(' . $filesize . ')</span>'
+                    . '</div>';
+            }
+        }
+
+        if ($html !== '')
+        {
+            $tpl_ary['ADMINHELPER_SEARCH_ATTACHES'] = $html;
+            $event['tpl_ary'] = $tpl_ary;
+        }
+    }
+
+    private function format_attach_filesize($bytes)
+    {
+        if ($bytes < 1024)
+        {
+            return $bytes . ' B';
+        }
+        if ($bytes < 1048576)
+        {
+            return round($bytes / 1024, 1) . ' KB';
+        }
+        return round($bytes / 1048576, 1) . ' MB';
+    }
+
+    private function get_attach_fa_icon($mime)
+    {
+        if (strpos($mime, 'pdf') !== false)
+        {
+            return 'fa-file-pdf-o';
+        }
+        if (strpos($mime, 'zip') !== false || strpos($mime, 'rar') !== false || strpos($mime, 'archive') !== false)
+        {
+            return 'fa-file-archive-o';
+        }
+        if (strpos($mime, 'video/') === 0)
+        {
+            return 'fa-file-video-o';
+        }
+        if (strpos($mime, 'audio/') === 0)
+        {
+            return 'fa-file-audio-o';
+        }
+        if (strpos($mime, 'text/') === 0)
+        {
+            return 'fa-file-text-o';
+        }
+        return 'fa-paperclip';
     }
 
     private function load_language()
