@@ -1762,24 +1762,36 @@ class listener implements EventSubscriberInterface
     }
 
     /**
-     * core.page_header — injecte ADMINHELPER_IS_MOD_OR_ADMIN dans le template
-     * et génère le form key CSRF pour les formulaires de notes.
+     * core.page_header — injecte ADMINHELPER_IS_MOD_OR_ADMIN dans le template.
+     *
+     * IMPORTANT : on NE PAS appeler add_form_key() ici — cette fonction phpBB
+     * écrase {S_FORM_TOKEN} globalement, ce qui casserait posting.php, ucp, etc.
+     * On génère le token CSRF manuellement dans une variable dédiée.
      */
     public function on_page_header($event)
     {
         $is_mod = $this->auth->acl_getf_global('m_edit') || $this->auth->acl_get('a_');
 
+        $this->template->assign_vars(['ADMINHELPER_IS_MOD_OR_ADMIN' => $is_mod]);
+
         if (!$is_mod)
         {
-            $this->template->assign_vars(['ADMINHELPER_IS_MOD_OR_ADMIN' => false]);
             return;
         }
 
         $this->load_language();
 
-        add_form_key('adminhelper_mod_note');
+        // Générer le token CSRF manuellement (même algorithme que add_form_key)
+        // sans appeler add_form_key() qui écraserait S_FORM_TOKEN sur toutes les pages.
+        $now = time();
+        $token_sid = ($this->user->data['user_id'] == ANONYMOUS && !empty($this->config['form_token_sid_guests']))
+            ? $this->user->data['session_id'] : '';
+        $token = sha1($now . generate_link_hash('adminhelper_mod_note') . $this->user->data['user_form_salt'] . 'adminhelper_mod_note' . $token_sid);
 
-        $this->template->assign_vars(['ADMINHELPER_IS_MOD_OR_ADMIN' => true]);
+        $csrf_fields = '<input type="hidden" name="creation_time" value="' . $now . '">'
+            . '<input type="hidden" name="form_token" value="' . htmlspecialchars($token, ENT_QUOTES) . '">';
+
+        $this->template->assign_vars(['ADMINHELPER_MOD_NOTE_FORM_TOKEN' => $csrf_fields]);
     }
 
     /**
