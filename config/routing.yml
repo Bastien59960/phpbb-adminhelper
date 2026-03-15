@@ -1,0 +1,14 @@
+adminhelper_mod_notes_list:
+    path: /adminhelper/mod-notes
+    defaults: { _controller: bastien59960.adminhelper.mod_notes:list_notes }
+    methods: [GET]
+
+adminhelper_mod_notes_save:
+    path: /adminhelper/mod-notes/save
+    defaults: { _controller: bastien59960.adminhelper.mod_notes:save }
+    methods: [POST]
+
+adminhelper_mod_notes_delete:
+    path: /adminhelper/mod-notes/delete/{note_id}
+    defaults: { _controller: bastien59960.adminhelper.mod_notes:delete, note_id: 0 }
+    methods: [POST]

@@ -18,6 +18,21 @@ services:
             - '@request'
             - '@template'
             - '@language'
+            - '@auth'
+            - '@user'
             - '@config'
+            - '%core.table_prefix%'
         tags:
             - { name: event.listener }
+
+    bastien59960.adminhelper.mod_notes:
+        class: bastien59960\adminhelper\controller\mod_notes_controller
+        arguments:
+            - '@dbal.conn'
+            - '@auth'
+            - '@user'
+            - '@template'
+            - '@language'
+            - '@request'
+            - '@controller.helper'
+            - '%core.table_prefix%'

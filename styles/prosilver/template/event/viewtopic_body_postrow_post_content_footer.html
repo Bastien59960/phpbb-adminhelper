@@ -1,0 +1,29 @@
+<!-- IF postrow.ADMINHELPER_CAN_MOD_NOTE -->
+
+	<!-- IF postrow.ADMINHELPER_HAS_NOTE -->
+	<div class="adminhelper-mod-note-box">
+		<div class="adminhelper-mod-note-meta">
+			<i class="icon fa-lock fa-fw" aria-hidden="true"></i> {postrow.ADMINHELPER_NOTE_BY}
+		</div>
+		<div class="adminhelper-mod-note-text">{postrow.ADMINHELPER_NOTE_TEXT}</div>
+		<form method="post" action="{postrow.ADMINHELPER_U_DELETE_NOTE}" style="margin-top:6px">
+			{S_FORM_TOKEN}
+			<button type="submit" class="button button-secondary" style="font-size:.85em">
+				<i class="icon fa-trash fa-fw" aria-hidden="true"></i> {L_ADMINHELPER_MOD_NOTE_DELETE}
+			</button>
+		</form>
+	</div>
+	<!-- ENDIF -->
+
+	<div class="adminhelper-note-editor" id="adminhelper-note-ed-{postrow.ADMINHELPER_POST_ID_NOTE}">
+		<form method="post" action="{postrow.ADMINHELPER_U_SAVE_NOTE}">
+			{S_FORM_TOKEN}
+			<input type="hidden" name="post_id" value="{postrow.ADMINHELPER_POST_ID_NOTE}">
+			<textarea name="note_text" placeholder="{L_ADMINHELPER_MOD_NOTE_PLACEHOLDER}">{postrow.ADMINHELPER_NOTE_TEXT}</textarea>
+			<button type="submit" class="button button-secondary" style="margin-top:4px;font-size:.85em">
+				<i class="icon fa-save fa-fw" aria-hidden="true"></i> {L_ADMINHELPER_MOD_NOTE_SAVE}
+			</button>
+		</form>
+	</div>
+
+<!-- ENDIF -->

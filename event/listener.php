@@ -10,7 +10,10 @@ class listener implements EventSubscriberInterface
     protected $request;
     protected $template;
     protected $language;
+    protected $auth;
+    protected $user;
     protected $config;
+    protected $mod_notes_table;
     protected $language_loaded;
     protected $search_is_author;
     protected $search_post_attaches;
@@ -31,13 +34,19 @@ class listener implements EventSubscriberInterface
         \phpbb\request\request $request,
         \phpbb\template\template $template,
         \phpbb\language\language $language,
-        ?\phpbb\config\config $config = null
+        \phpbb\auth\auth $auth,
+        \phpbb\user $user,
+        ?\phpbb\config\config $config = null,
+        string $table_prefix = 'phpbb3_'
     ) {
         $this->db = $db;
         $this->request = $request;
         $this->template = $template;
         $this->language = $language;
+        $this->auth = $auth;
+        $this->user = $user;
         $this->config = $config;
+        $this->mod_notes_table = $table_prefix . 'adminhelper_mod_notes';
         $this->language_loaded = false;
         $this->search_is_author = false;
         $this->search_post_attaches = [];
@@ -71,6 +80,8 @@ class listener implements EventSubscriberInterface
             'core.ucp_notifications_submit_notification_is_set' => 'ucp_notifications_submit_notification_is_set',
             'core.search_modify_rowset'                        => 'on_search_author_rowset',
             'core.search_modify_tpl_ary'                       => 'on_search_author_tpl_ary',
+            'core.page_header'                                 => 'on_page_header',
+            'core.viewtopic_post_row_after'                    => 'on_viewtopic_post_row',
         ];
     }
 
@@ -1748,5 +1759,83 @@ class listener implements EventSubscriberInterface
 
         $this->language->add_lang('info_acp_adminhelper', 'bastien59960/adminhelper');
         $this->language_loaded = true;
+    }
+
+    /**
+     * core.page_header — injecte ADMINHELPER_IS_MOD_OR_ADMIN dans le template
+     * et génère le form key CSRF pour les formulaires de notes.
+     */
+    public function on_page_header($event)
+    {
+        $is_mod = $this->auth->acl_getf_global('m_edit') || $this->auth->acl_get('a_');
+
+        if (!$is_mod)
+        {
+            $this->template->assign_vars(['ADMINHELPER_IS_MOD_OR_ADMIN' => false]);
+            return;
+        }
+
+        $this->load_language();
+
+        add_form_key('adminhelper_mod_note');
+
+        $this->template->assign_vars(['ADMINHELPER_IS_MOD_OR_ADMIN' => true]);
+    }
+
+    /**
+     * core.viewtopic_post_row_after — charge la note de modération du post courant
+     * et l'injecte dans le bloc postrow via alter_block_array.
+     */
+    public function on_viewtopic_post_row($event)
+    {
+        $row      = $event['row'];
+        $post_id  = (int) $row['post_id'];
+        $forum_id = (int) $row['forum_id'];
+
+        $can_note = $this->auth->acl_get('m_edit', $forum_id) || $this->auth->acl_get('a_');
+
+        if (!$can_note)
+        {
+            return;
+        }
+
+        $this->load_language();
+
+        // Charger la note existante pour ce post
+        $sql = 'SELECT n.note_id, n.note_text, n.note_created, u.username AS note_author
+                FROM ' . $this->mod_notes_table . ' n
+                LEFT JOIN ' . USERS_TABLE . ' u ON u.user_id = n.note_author_id
+                WHERE n.post_id = ' . $post_id;
+        $result = $this->db->sql_query($sql);
+        $note   = $this->db->sql_fetchrow($result);
+        $this->db->sql_freeresult($result);
+
+        // Construire les URLs des actions
+        $board_url   = generate_board_url();
+        $u_save      = $board_url . '/app.php/adminhelper/mod-notes/save';
+        $u_delete    = $note
+            ? $board_url . '/app.php/adminhelper/mod-notes/delete/' . (int) $note['note_id']
+            : '';
+
+        $note_by = '';
+        if ($note)
+        {
+            $note_by = $this->language->lang(
+                'ADMINHELPER_MOD_NOTE_BY',
+                $note['note_author'],
+                $this->user->format_date((int) $note['note_created'])
+            );
+        }
+
+        $this->template->alter_block_array('postrow', [
+            'ADMINHELPER_CAN_MOD_NOTE'  => true,
+            'ADMINHELPER_HAS_NOTE'      => !empty($note),
+            'ADMINHELPER_NOTE_TEXT'     => $note ? $note['note_text'] : '',
+            'ADMINHELPER_NOTE_BY'       => $note_by,
+            'ADMINHELPER_NOTE_ID'       => $note ? (int) $note['note_id'] : 0,
+            'ADMINHELPER_U_SAVE_NOTE'   => $u_save,
+            'ADMINHELPER_U_DELETE_NOTE' => $u_delete,
+            'ADMINHELPER_POST_ID_NOTE'  => $post_id,
+        ], true, 'change');
     }
 }

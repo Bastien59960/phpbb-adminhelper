@@ -1,0 +1,21 @@
+<!-- IF postrow.ADMINHELPER_CAN_MOD_NOTE -->
+<li>
+	<button
+		type="button"
+		class="button button-icon-only adminhelper-note-btn"
+		title="{L_ADMINHELPER_MOD_NOTE_BTN}"
+		onclick="(function(){ var ed = document.getElementById('adminhelper-note-ed-{postrow.ADMINHELPER_POST_ID_NOTE}'); ed.style.display = (ed.style.display === 'block') ? 'none' : 'block'; })()"
+		aria-label="{L_ADMINHELPER_MOD_NOTE_BTN}"
+	>
+		<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 16 16" aria-hidden="true" focusable="false" style="vertical-align:middle;display:inline-block">
+			<rect x="1.5" y="1" width="9" height="13" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/>
+			<line x1="3.5" y1="4.5" x2="8.5" y2="4.5" stroke="currentColor" stroke-width="1.1"/>
+			<line x1="3.5" y1="7"   x2="8.5" y2="7"   stroke="currentColor" stroke-width="1.1"/>
+			<line x1="3.5" y1="9.5" x2="6.5" y2="9.5" stroke="currentColor" stroke-width="1.1"/>
+			<path d="M10.5 9 l2.5-2.5 1.2 1.2 -2.5 2.5z" fill="currentColor"/>
+			<path d="M10.5 9 l-0.8 2.5 2.5-0.8z" fill="currentColor"/>
+		</svg>
+		<span class="sr-only">{L_ADMINHELPER_MOD_NOTE_BTN}</span>
+	</button>
+</li>
+<!-- ENDIF -->

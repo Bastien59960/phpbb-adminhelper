@@ -1,0 +1,49 @@
+{% if ADMINHELPER_IS_MOD_OR_ADMIN is defined and ADMINHELPER_IS_MOD_OR_ADMIN %}
+<style>
+/* Admin Helper — boutons "danger" : Éditer et Note de modération */
+.post-buttons a[href*="mode=edit"],
+.adminhelper-note-btn {
+	outline: 2px solid #c00;
+	outline-offset: 1px;
+	border-radius: 2px;
+}
+/* Admin Helper — éditeur inline de note */
+.adminhelper-note-editor {
+	display: none;
+	margin-top: 6px;
+	padding: 8px 10px;
+	background: #fff8e1;
+	border-left: 3px solid #e67e22;
+	border-radius: 2px;
+}
+.adminhelper-note-editor textarea {
+	width: 100%;
+	min-height: 64px;
+	font-size: .9em;
+	box-sizing: border-box;
+	border: 1px solid #ccc;
+	border-radius: 2px;
+	padding: 4px 6px;
+	resize: vertical;
+	font-family: inherit;
+}
+/* Admin Helper — affichage note existante sous le post */
+.adminhelper-mod-note-box {
+	margin: 8px 0 0;
+	padding: 6px 10px;
+	background: #fff3cd;
+	border-left: 3px solid #e0a800;
+	border-radius: 2px;
+	font-size: .9em;
+}
+.adminhelper-mod-note-meta {
+	color: #888;
+	font-size: .85em;
+	margin-bottom: 4px;
+}
+.adminhelper-mod-note-text {
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+</style>
+{% endif %}
