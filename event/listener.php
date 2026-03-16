@@ -1786,7 +1786,7 @@ class listener implements EventSubscriberInterface
         $now = time();
         $token_sid = ($this->user->data['user_id'] == ANONYMOUS && !empty($this->config['form_token_sid_guests']))
             ? $this->user->data['session_id'] : '';
-        $token = sha1($now . generate_link_hash('adminhelper_mod_note') . $this->user->data['user_form_salt'] . 'adminhelper_mod_note' . $token_sid);
+        $token = sha1($now . $this->user->data['user_form_salt'] . 'adminhelper_mod_note' . $token_sid);
 
         $csrf_fields = '<input type="hidden" name="creation_time" value="' . $now . '">'
             . '<input type="hidden" name="form_token" value="' . htmlspecialchars($token, ENT_QUOTES) . '">';
