@@ -21,9 +21,26 @@ services:
             - '@auth'
             - '@user'
             - '@config'
+            - '@bastien59960.adminhelper.attachment_ai_manager'
             - '%core.table_prefix%'
         tags:
             - { name: event.listener }
+
+    bastien59960.adminhelper.console.attachment_ai_scan:
+        class: bastien59960\adminhelper\console\attachment_ai_scan
+        arguments:
+            - '@user'
+            - '@bastien59960.adminhelper.attachment_ai_manager'
+        tags:
+            - { name: console.command }
+
+    bastien59960.adminhelper.attachment_ai_manager:
+        class: bastien59960\adminhelper\service\attachment_ai_manager
+        arguments:
+            - '@dbal.conn'
+            - '@config'
+            - '%core.root_path%'
+            - '%core.table_prefix%'
 
     bastien59960.adminhelper.mod_notes:
         class: bastien59960\adminhelper\controller\mod_notes_controller

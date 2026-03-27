@@ -20,6 +20,12 @@ class main_module
 
         $user->add_lang_ext('bastien59960/adminhelper', 'acp/info_acp_adminhelper');
 
+        if ($mode === 'attachment_ai')
+        {
+            $this->handle_attachment_ai_mode($phpbb_container, $request, $template, $user);
+            return;
+        }
+
         $this->tpl_name = 'acp_adminhelper_unsubscribe_log';
         $this->page_title = $user->lang('ACP_ADMINHELPER_UNSUBSCRIBE_LOGS');
 
@@ -482,5 +488,109 @@ class main_module
             'PAGINATION' => '',
             'S_ON_PAGE' => $pagination->on_page($total_logs, $per_page, $start),
         ]);
+    }
+
+    private function handle_attachment_ai_mode($phpbb_container, $request, $template, $user)
+    {
+        $this->tpl_name = 'acp_adminhelper_attachment_ai';
+        $this->page_title = $user->lang('ACP_ADMINHELPER_ATTACHMENT_AI');
+
+        $manager = $phpbb_container->get('bastien59960.adminhelper.attachment_ai_manager');
+        $db_tools = $phpbb_container->get('dbal.tools');
+        if (!$db_tools->sql_table_exists($manager->get_flags_table()))
+        {
+            trigger_error($user->lang('ACP_ADMINHELPER_LOG_TABLE_MISSING') . adm_back_link($this->u_action), E_USER_WARNING);
+        }
+
+        add_form_key('adminhelper_attachment_ai');
+
+        if ($request->is_set_post('scan_ai_attachments'))
+        {
+            if (!check_form_key('adminhelper_attachment_ai'))
+            {
+                trigger_error($user->lang('FORM_INVALID') . adm_back_link($this->u_action), E_USER_WARNING);
+            }
+
+            $result = $manager->scan_attachment_batch(500);
+            trigger_error(
+                $user->lang(
+                    'ACP_ADMINHELPER_ATTACHMENT_AI_SCAN_DONE',
+                    (int) ($result['processed'] ?? 0),
+                    (int) ($result['detected'] ?? 0),
+                    (int) ($result['clean'] ?? 0),
+                    (int) ($result['remaining'] ?? 0)
+                ) . adm_back_link($this->u_action)
+            );
+        }
+
+        $stats = $manager->get_scan_stats();
+        $rows = [];
+        foreach ($manager->get_recent_flagged_rows(50) as $row)
+        {
+            $rows[] = [
+                'UPDATED_AT' => !empty($row['updated_at']) ? $user->format_date((int) $row['updated_at']) : '',
+                'ATTACH_ID' => (int) ($row['attach_id'] ?? 0),
+                'REAL_FILENAME' => (string) ($row['real_filename'] ?? ''),
+                'STATE_LABEL' => (!empty($row['is_forced']))
+                    ? $user->lang('ACP_ADMINHELPER_ATTACHMENT_AI_STATE_FORCED')
+                    : $user->lang('ACP_ADMINHELPER_ATTACHMENT_AI_STATE_MANUAL'),
+                'PROVIDER_LABEL' => $this->attachment_ai_provider_label($user, (string) ($row['ai_provider'] ?? '')),
+                'SOURCE_LABEL' => $this->attachment_ai_source_label($user, (string) ($row['detection_source'] ?? '')),
+                'REASON_LABEL' => $this->attachment_ai_reason_label($user, (string) ($row['detection_reason'] ?? '')),
+                'POST_ID' => (int) ($row['post_id'] ?? 0),
+            ];
+        }
+
+        $template->assign_vars([
+            'U_ACTION' => $this->u_action,
+            'STATS_ATTACHMENTS_CANDIDATES' => (int) ($stats['attachments_candidates'] ?? 0),
+            'STATS_ATTACHMENTS_PROCESSED' => (int) ($stats['attachments_processed'] ?? 0),
+            'STATS_ATTACHMENTS_REMAINING' => (int) ($stats['attachments_remaining'] ?? 0),
+            'STATS_ATTACHMENTS_DETECTED' => (int) ($stats['attachments_detected'] ?? 0),
+            'STATS_ATTACHMENTS_MANUAL' => (int) ($stats['attachments_manual'] ?? 0),
+            'STATS_ATTACHMENTS_PROGRESS_PCT' => (int) ($stats['attachments_progress_pct'] ?? 0),
+        ]);
+
+        foreach ($rows as $row)
+        {
+            $template->assign_block_vars('ai_rows', $row);
+        }
+    }
+
+    private function attachment_ai_source_label($user, $source)
+    {
+        switch ((string) $source)
+        {
+            case 'c2pa':
+                return $user->lang('ADMINHELPER_AI_SOURCE_C2PA');
+            case 'metadata':
+                return $user->lang('ADMINHELPER_AI_SOURCE_METADATA');
+            case 'prompt':
+                return $user->lang('ADMINHELPER_AI_SOURCE_PROMPT');
+            default:
+                return '-';
+        }
+    }
+
+    private function attachment_ai_provider_label($user, $provider)
+    {
+        $key = 'ADMINHELPER_AI_PROVIDER_' . strtoupper((string) $provider);
+        if (isset($user->lang[$key]))
+        {
+            return $user->lang($key);
+        }
+
+        return '-';
+    }
+
+    private function attachment_ai_reason_label($user, $reason)
+    {
+        $key = 'ACP_ADMINHELPER_ATTACHMENT_AI_REASON_' . strtoupper((string) $reason);
+        if (isset($user->lang[$key]))
+        {
+            return $user->lang($key);
+        }
+
+        return (string) $reason !== '' ? (string) $reason : '-';
     }
 }

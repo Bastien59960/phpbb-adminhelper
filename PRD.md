@@ -1,200 +1,151 @@
 # PRD — bastien59960/adminhelper
 
-**Dernière mise à jour :** 2026-03-15
-**Extension :** `ext/bastien59960/adminhelper`
-**Version courante :** 1.0.3 (en développement)
-
----
+**Dernière mise à jour :** 2026-03-27  
+**Extension :** `ext/bastien59960/adminhelper`  
+**Version courante :** 1.0.5
 
 ## Objectif
 
-Extension de confort pour l'administration du forum : durcissement des emails de masse, conformité RFC 8058 désinscription, logs d'audit, correctif du cron_lock phpBB, amélioration de la recherche de posts par auteur, et notes de modération sur les posts.
+Fournir une extension d'administration phpBB polyvalente qui centralise plusieurs besoins concrets du forum :
 
----
+- sécuriser et tracer les emails ACP
+- fiabiliser les tâches cron
+- améliorer la recherche par auteur
+- donner aux modérateurs des outils internes sur les posts
+- déclarer et détecter les images générées par IA sur les pièces jointes
 
-## Fonctionnalités
+## Fonctionnalités livrées
 
-### 1. Recherche membre par email (ACP)
+### 1. Recherche membre par email dans l'ACP
 
-`ACP > Utilisateurs et groupes > Gérer les utilisateurs`
+Ajout d'un champ de recherche par adresse email dans la gestion des membres.
 
-Ajout d'un champ de recherche par adresse email pour retrouver un membre quand son pseudo est inconnu. Hook sur `core.common` (avant `IN_ADMIN`).
+### 2. Durcissement des emails ACP
 
----
+- contenu HTML optionnel avec fallback texte
+- pied de désinscription
+- mode d'envoi compatible gros volumes
+- support RFC 8058 (`List-Unsubscribe`, one-click)
+- liens signés HMAC à expiration
 
-### 2. Emails de masse ACP — durcissement
+### 3. Gestion et audit des désinscriptions
 
-`ACP > Général > Communication client > Email`
+- interception des requêtes signées
+- page de confirmation et action one-click
+- journal d'audit en base
+- restauration admin des notifications forum
+- nettoyage des notifications obsolètes
 
-- Contenu HTML optionnel avec fallback plain-text automatique.
-- Pied de page de désinscription inséré automatiquement.
-- Mode envoi en file sécurisé pour les grands volumes.
-- En-têtes RFC 8058 ajoutés : `List-Unsubscribe` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click`.
-- Liens signés HMAC à expiration par destinataire.
-- Scopes distincts : `massmail`, `forum_notify`.
+### 4. Fiabilisation du `cron_lock`
 
----
+- remplacement du listener cron phpBB par une variante avec `try/finally`
+- watchdog shell pour les locks orphelins
 
-### 3. Gestion des désinscriptions (RFC 8058)
+### 5. Recherche par auteur sans troncature
 
-- Interception des requêtes signées sur l'entrypoint forum.
-- Page de confirmation (GET) + action one-click (POST).
-- Vérification signature / expiry / mapping utilisateur avant application.
-- Codes HTTP explicites : 200, 400, 403, 410.
-- Suivi des changements de préférence UCP (notification désactivée manuellement depuis le panneau utilisateur).
+- rechargement du `post_text` complet
+- rendu des PJ non-inline dans les résultats de recherche
 
----
+### 6. Notes de modération sur les posts
 
-### 4. Logs de désinscriptions (ACP)
+- bouton d'action réservé modérateurs/admins
+- note interne unique par post
+- page récapitulative "Posts à modérer"
 
-`ACP > Extensions > Admin Helper > Logs désinscriptions`
+### 7. Images générées par IA sur les pièces jointes
 
-- Compteurs globaux massmail / notifications forum.
-- Journal détaillé : date, type, statut, membre, email, code HTTP, méthode, IP, expiry token, user-agent.
-- Action admin : restaurer les notifications forum d'un membre.
-- Action admin : purger les vieilles notifications non lues (avec prévisualisation du volume).
-- Suppression sélective / bulk des entrées de log.
+#### Objectif fonctionnel
 
-**Table :** `phpbb3_adminhelper_unsubscribe_log`
+Permettre de :
 
----
+- déclarer manuellement qu'une image jointe a été générée par IA
+- détecter automatiquement certaines origines IA fortes à l'upload ou en scan batch
+- avertir publiquement les lecteurs sous l'image
+- afficher la source IA seulement quand elle est prouvée automatiquement
 
-### 5. Correctif cron_lock phpBB (2026-03-06)
+#### Règles produit
 
-**Problème :** `shell_exec()` dans `stats/listener.php` acquiert le mutex POSIX `popen_list_mutex` (PI mutex glibc). Deux workers Apache simultanés → blocage en cascade 13+ minutes, le cron ne se libère plus.
+- Le marquage IA général peut être manuel ou automatique.
+- La source IA (`Gemini`, `ChatGPT`, etc.) n'est jamais attribuée manuellement par l'extension.
+- Si aucune preuve technique fiable n'est trouvée, seul l'avertissement IA générique est affiché.
+- Une détection forte verrouille la case côté publication.
+- L'intégration doit rester compatible avec les brouillons et le flux GeoExplorer.
 
-**Fix 1 — Safe cron runner :**
-`event/safe_cron_runner_listener.php` surcharge `cron.event_listener` avec try-finally → libère le lock même en cas d'exception. Priorité d'événement sur phpBB core.
+#### Détection technique actuelle
 
-**Fix 2 — Watchdog :**
-`tools/cron_watchdog.sh` lancé toutes les 5 minutes via crontab. Libère les locks orphelins de plus de 300 s.
-Log : `/var/log/phpbb_cron_watchdog.log`
+Sources fortes prises en charge :
 
-**Fix 3 :** Suppression du `shell_exec` dans `get_cached_hostname` → retourne null si cache miss → vérification rDNS différée en async.
+- C2PA / Content Credentials
+- métadonnées de générateurs IA connus
+- prompts / paramètres IA conservés dans les fichiers
 
----
+Sources actuellement observées et validées sur le forum :
 
-### 6. Affichage complet des posts sur recherche par auteur (2026-03-15)
+- `Gemini` via marqueurs Google Generative AI / `trainedAlgorithmicMedia`
+- `ChatGPT` via marqueurs OpenAI / ChatGPT / C2PA
 
-`search.php?author_id=N&sr=posts`
+#### Interfaces livrées
 
-Quand on recherche les posts d'un auteur, phpBB tronque les messages longs (flag `display_text_only=true`) et supprime les pièces jointes non-inline de la vue template. Cette fonctionnalité corrige les deux problèmes :
+- case IA sur les images lors de la publication / modification
+- avertissement public sous l'image sur le forum
+- ligne "Source IA détectée : …" si un provider est identifié automatiquement
+- module ACP de suivi et scan batch
+- commande CLI `adminhelper:attachment-ai-scan`
 
-**Corps complet :**
-Hook `core.search_modify_rowset` — si `display_text_only=true`, re-fetch `post_text` / `bbcode_uid` / `bbcode_bitfield` depuis `phpbb3_posts` et force `display_text_only=false`. Le BBCode est rendu normalement (images inline incluses).
+## Schéma de données
 
-**Pièces jointes non-inline :**
-phpBB fait `unset($attachments[$post_id])` après `parse_attachments()` dans `search.php`, avant l'event `core.search_modify_tpl_ary`. Les PJ sont donc perdues au moment du template.
-Fix : stocker les lignes brutes DB des PJ dans une propriété listener lors de `core.search_modify_rowset` (avant la destruction), les consommer dans `core.search_modify_tpl_ary`.
+| Table | Rôle |
+|---|---|
+| `adminhelper_unsubscribe_log` | audit des désinscriptions |
+| `adminhelper_mod_notes` | notes internes par post |
+| `adminhelper_attachment_ai` | état IA des pièces jointes image |
 
-**Détection inline :** si `attach_id` apparaît dans l'URL du HTML rendu du message (`id=<N>`), la PJ est déjà affichée inline → ignorée.
+### `adminhelper_attachment_ai`
 
-**Rendu des PJ non-inline :**
-- Image avec miniature → miniature cliquable + lien téléchargement.
-- Image sans miniature → image directe (max 72px height).
-- Autre type → icône FontAwesome 4 + lien téléchargement + taille du fichier.
+Colonnes principales :
 
-**Template events créés :**
-- `search_results_header_before.html` — injection CSS `.adminhelper-search-attaches` / `.adminhelper-attach-item`.
-- `search_results_content_after.html` — rendu conditionnel de `ADMINHELPER_SEARCH_ATTACHES`.
-
----
-
-### 7. Notes de modération sur les posts (2026-03-15)
-
-Fonctionnalité réservée aux modérateurs et administrateurs permettant d'attacher une note interne à n'importe quel post du forum. Ces notes sont invisibles des membres ordinaires.
-
-#### 7a. Icône dans la barre d'actions du post
-
-Un bouton SVG "bloc-notes + crayon" s'ajoute à la barre `Éditer / Supprimer / Rapporter / Avertir / Info / Citer`, visible uniquement si l'utilisateur a le droit `m_edit` sur le forum du post (ou `a_` global admin). Cliquer dessus affiche/masque un éditeur inline (textarea + bouton Enregistrer).
-
-Le bouton "note de modération" est entouré d'un **bord rouge 2 px** (signal de danger). L'icône "Éditer le post" (fa-pencil, souvent confondue avec "Citer") reçoit le même traitement.
-
-#### 7b. Affichage de la note existante
-
-Si une note existe sur un post, une zone `adminhelper-mod-note-box` s'affiche en bas du post (sous la signature), visible uniquement aux modérateurs/admins. Elle contient :
-- le texte de la note,
-- l'auteur de la note et la date,
-- un bouton "Supprimer la note" (POST sécurisé avec form key).
-
-Un seul note par post (UNIQUE sur `post_id`). L'enregistrement d'une nouvelle note remplace l'existante.
-
-#### 7c. Page "Consulter les posts à modérer"
-
-Accessible via le **menu Accès rapide** (dropdown "hamburger") — sous l'entrée "Brouillons" ajoutée par geoexplo. Lien visible uniquement si `ADMINHELPER_IS_MOD_OR_ADMIN = true` (injecté en `core.page_header`).
-
-Page listée à `/app.php/adminhelper/mod-notes` :
-- Tableau de tous les posts ayant une note : date note, auteur note, titre post, auteur post, forum, extrait de note, lien direct, bouton "Supprimer".
-- Accessible uniquement aux modérateurs/admins (vérification `$auth->acl_getf_global('m_edit')` ou admin).
-
-#### 7d. Sécurité
-
-- Contrôle d'accès : `$auth->acl_get('m_edit', $forum_id)` pour chaque action sur un post.
-- CSRF : formulaires protégés par `add_form_key()` / `check_form_key()` phpBB.
-- Suppression : vérification que la note appartient bien au forum sur lequel l'utilisateur est modérateur.
-
-**Table :** `phpbb3_adminhelper_mod_notes`
-```
-note_id       UINT AUTO_INCREMENT PK
-post_id       UINT NOT NULL UNIQUE
-forum_id      UINT NOT NULL
-note_text     TEXT NOT NULL
-note_author_id UINT NOT NULL
-note_created  UINT NOT NULL
-```
-
-**Nouveaux événements phpBB :**
-- `core.page_header` → injection de `ADMINHELPER_IS_MOD_OR_ADMIN`
-- `core.viewtopic_post_row_after` → chargement de la note du post, injection via `alter_block_array`
-
-**Nouveaux fichiers template :**
-- `event/viewtopic_body_post_buttons_after.html` — bouton icône note
-- `event/viewtopic_body_postrow_post_content_footer.html` — affichage note + formulaire éditeur
-- `event/navbar_header_quick_links_after.html` — lien "Posts à modérer"
-- `event/overall_header_head_append.html` — CSS global (bords rouges + styles note)
-- `adminhelper_mod_notes.html` — page liste complète
-
----
+- `attach_id`
+- `post_id`
+- `user_id`
+- `is_ai_generated`
+- `is_forced`
+- `ai_provider`
+- `scan_status`
+- `detection_source`
+- `detection_reason`
+- `created_at`
+- `updated_at`
 
 ## Migrations
 
 | Fichier | Contenu |
 |---|---|
-| `release_1_0_1.php` | Table `adminhelper_unsubscribe_log`, configs, module ACP |
-| `release_1_0_2.php` | Compteurs UCP, stats emails réactions |
-| `release_1_0_3.php` | Table `adminhelper_mod_notes` (notes de modération) |
-
-Aucune migration n'est nécessaire pour la fonctionnalité de recherche (2026-03-15) : tout est traité en PHP/template, sans schéma DB supplémentaire.
-
----
-
-## Dépendances internes
-
-- Utilise les événements phpBB : `core.common`, `core.page_header`, `core.search_modify_rowset`, `core.search_modify_tpl_ary`, `core.acp_users_modify_sql_query`, `core.submit_post_modify_sql_data`, `core.viewtopic_post_row_after`.
-- Surcharge du service `cron.event_listener` pour le correctif lock.
-- Pas de dépendance externe (pas d'API tierce).
-
----
+| `release_1_0_1.php` | logs de désinscription |
+| `release_1_0_2.php` | compléments UCP / logs |
+| `release_1_0_3.php` | notes de modération |
+| `release_1_0_4.php` | table et ACP de suivi IA pièces jointes |
+| `release_1_0_5.php` | stockage du provider IA détecté |
 
 ## Fichiers clés
 
+```text
+event/listener.php
+cron/safe_cron_runner_listener.php
+controller/mod_notes_controller.php
+service/attachment_ai_manager.php
+console/attachment_ai_scan.php
+acp/main_module.php
+adm/style/acp_adminhelper_attachment_ai.html
+migrations/release_1_0_4.php
+migrations/release_1_0_5.php
+styles/all/template/event/posting_attach_body_file_list_after.html
+styles/all/template/adminhelper_ai_posting.js
+styles/all/template/event/attachment_file_append.html
 ```
-event/listener.php                          — abonnements événements phpBB
-event/safe_cron_runner_listener.php         — surcharge cron lock fix
-acp/main_module.php                         — contrôleur ACP logs désinscriptions
-controller/mod_notes_controller.php         — CRUD notes + page liste (v1.0.3)
-migrations/release_1_0_1.php               — schéma initial
-migrations/release_1_0_2.php               — stats UCP
-migrations/release_1_0_3.php               — table adminhelper_mod_notes
-tools/cron_watchdog.sh                      — watchdog lock orphelins
-config/routing.yml                          — routes controller mod_notes
-styles/prosilver/template/event/
-  search_results_header_before.html         — CSS injection (search)
-  search_results_content_after.html         — PJ non-inline rendu
-  overall_header_head_append.html           — CSS global mod-notes + bords danger
-  viewtopic_body_post_buttons_after.html    — bouton icône note modération
-  viewtopic_body_postrow_post_content_footer.html — affichage note + éditeur
-  navbar_header_quick_links_after.html      — lien "Posts à modérer" (mods only)
-styles/prosilver/template/
-  adminhelper_mod_notes.html               — page liste tous les posts avec note
-```
+
+## Contraintes et non-objectifs
+
+- Pas d'attribution manuelle du moteur IA.
+- Pas de dépendance à une API externe.
+- Pas de confiance dans un simple indice faible comme la seule présence du mot `c2pa`.
+- Les chaînes AI les plus récentes sont documentées et maintenues en priorité en `fr` et `en`.

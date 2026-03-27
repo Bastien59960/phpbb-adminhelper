@@ -1,0 +1,78 @@
+{% include 'overall_header.html' %}
+
+<h1>{L_ACP_ADMINHELPER_ATTACHMENT_AI}</h1>
+<p>{L_ACP_ADMINHELPER_ATTACHMENT_AI_EXPLAIN}</p>
+
+<fieldset>
+    <legend>{L_ACP_ADMINHELPER_ATTACHMENT_AI_STATS}</legend>
+    <dl>
+        <dt><label>{L_ACP_ADMINHELPER_ATTACHMENT_AI_CANDIDATES}:</label></dt>
+        <dd><strong>{{ STATS_ATTACHMENTS_CANDIDATES }}</strong></dd>
+    </dl>
+    <dl>
+        <dt><label>{L_ACP_ADMINHELPER_ATTACHMENT_AI_PROCESSED}:</label></dt>
+        <dd>
+            <strong>{{ STATS_ATTACHMENTS_PROCESSED }}</strong>
+            /
+            {{ STATS_ATTACHMENTS_CANDIDATES }}
+            ({{ STATS_ATTACHMENTS_PROGRESS_PCT }}%)
+        </dd>
+    </dl>
+    <dl>
+        <dt><label>{L_ACP_ADMINHELPER_ATTACHMENT_AI_REMAINING}:</label></dt>
+        <dd><strong>{{ STATS_ATTACHMENTS_REMAINING }}</strong></dd>
+    </dl>
+    <dl>
+        <dt><label>{L_ACP_ADMINHELPER_ATTACHMENT_AI_DETECTED}:</label></dt>
+        <dd><strong>{{ STATS_ATTACHMENTS_DETECTED }}</strong></dd>
+    </dl>
+    <dl>
+        <dt><label>{L_ACP_ADMINHELPER_ATTACHMENT_AI_MANUAL}:</label></dt>
+        <dd><strong>{{ STATS_ATTACHMENTS_MANUAL }}</strong></dd>
+    </dl>
+</fieldset>
+
+<form method="post" action="{{ U_ACTION|raw }}">
+    <fieldset class="submit-buttons">
+        <input type="submit" class="button2" name="scan_ai_attachments" value="{L_ACP_ADMINHELPER_ATTACHMENT_AI_SCAN}" />
+        {S_FORM_TOKEN}
+    </fieldset>
+</form>
+
+<fieldset>
+    <legend>{L_ACP_ADMINHELPER_ATTACHMENT_AI_RECENT}</legend>
+    <table class="table1">
+        <thead>
+            <tr>
+                <th>{L_ACP_ADMINHELPER_ATTACHMENT_AI_COL_UPDATED}</th>
+                <th>{L_ACP_ADMINHELPER_ATTACHMENT_AI_COL_ATTACH_ID}</th>
+                <th>{L_ACP_ADMINHELPER_ATTACHMENT_AI_COL_FILE}</th>
+                <th>{L_ACP_ADMINHELPER_ATTACHMENT_AI_COL_STATE}</th>
+                <th>{L_ACP_ADMINHELPER_ATTACHMENT_AI_COL_PROVIDER}</th>
+                <th>{L_ACP_ADMINHELPER_ATTACHMENT_AI_COL_SOURCE}</th>
+                <th>{L_ACP_ADMINHELPER_ATTACHMENT_AI_COL_REASON}</th>
+                <th>{L_ACP_ADMINHELPER_ATTACHMENT_AI_COL_POST}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in ai_rows %}
+            <tr class="{% if loop.index is odd %}row1{% else %}row2{% endif %}">
+                <td>{{ row.UPDATED_AT|e }}</td>
+                <td>{{ row.ATTACH_ID|e }}</td>
+                <td>{{ row.REAL_FILENAME|e }}</td>
+                <td>{{ row.STATE_LABEL|e }}</td>
+                <td>{{ row.PROVIDER_LABEL|e }}</td>
+                <td>{{ row.SOURCE_LABEL|e }}</td>
+                <td>{{ row.REASON_LABEL|e }}</td>
+                <td>{% if row.POST_ID > 0 %}#{{ row.POST_ID }}{% else %}-{% endif %}</td>
+            </tr>
+            {% else %}
+            <tr class="row1">
+                <td colspan="8">{L_ACP_ADMINHELPER_ATTACHMENT_AI_EMPTY}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</fieldset>
+
+{% include 'overall_footer.html' %}

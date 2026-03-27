@@ -3,6 +3,7 @@ namespace bastien59960\adminhelper\event;
 
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use phpbb\request\request_interface;
+use bastien59960\adminhelper\service\attachment_ai_manager;
 
 class listener implements EventSubscriberInterface
 {
@@ -13,6 +14,7 @@ class listener implements EventSubscriberInterface
     protected $auth;
     protected $user;
     protected $config;
+    protected $attachment_ai_manager;
     protected $mod_notes_table;
     protected $language_loaded;
     protected $search_is_author;
@@ -37,6 +39,7 @@ class listener implements EventSubscriberInterface
         \phpbb\auth\auth $auth,
         \phpbb\user $user,
         ?\phpbb\config\config $config = null,
+        attachment_ai_manager $attachment_ai_manager,
         string $table_prefix = 'phpbb3_'
     ) {
         $this->db = $db;
@@ -46,6 +49,7 @@ class listener implements EventSubscriberInterface
         $this->auth = $auth;
         $this->user = $user;
         $this->config = $config;
+        $this->attachment_ai_manager = $attachment_ai_manager;
         $this->mod_notes_table = $table_prefix . 'adminhelper_mod_notes';
         $this->language_loaded = false;
         $this->search_is_author = false;
@@ -75,6 +79,10 @@ class listener implements EventSubscriberInterface
             'core.notification_message_email'  => 'notification_message_email',
             'core.notification_message_process' => 'notification_message_process',
             'core.modify_email_headers'        => 'modify_email_headers',
+            'core.posting_modify_template_vars' => 'inject_attachment_ai_posting_vars',
+            'core.modify_attachment_data_on_upload' => 'handle_attachment_ai_upload_data',
+            'core.modify_attachment_data_on_submit' => 'handle_attachment_ai_upload_data',
+            'core.submit_post_end' => 'sync_attachment_ai_submission',
             'core.ucp_prefs_personal_update_data' => 'ucp_prefs_personal_update_data',
             'core.ucp_prefs_post_update_data'  => 'ucp_prefs_post_update_data',
             'core.ucp_notifications_submit_notification_is_set' => 'ucp_notifications_submit_notification_is_set',
@@ -82,7 +90,143 @@ class listener implements EventSubscriberInterface
             'core.search_modify_tpl_ary'                       => 'on_search_author_tpl_ary',
             'core.page_header'                                 => 'on_page_header',
             'core.viewtopic_post_row_after'                    => 'on_viewtopic_post_row',
+            'core.parse_attachments_modify_template_data'      => 'on_parse_attachment_ai_warning',
         ];
+    }
+
+    public function inject_attachment_ai_posting_vars($event)
+    {
+        $forum_id = (int) ($event['forum_id'] ?? 0);
+        if ($forum_id <= 0) {
+            return;
+        }
+
+        $this->load_language();
+
+        $page_data = $event['page_data'];
+        $post_id = (int) ($event['post_id'] ?? 0);
+
+        $requested_checked_ids = $this->attachment_ai_manager->parse_attachment_id_csv(
+            $this->request->variable('geoexplo_ai_generated_attachment_ids', '', true)
+        );
+        $requested_forced_ids = $this->attachment_ai_manager->parse_attachment_id_csv(
+            $this->request->variable('geoexplo_ai_forced_attachment_ids', '', true)
+        );
+        $attachment_ids = $this->get_requested_attachment_ids();
+        if (empty($attachment_ids) && $post_id > 0) {
+            $attachment_ids = $this->attachment_ai_manager->get_post_image_attachment_ids($post_id);
+        }
+
+        $posting_state = $this->attachment_ai_manager->get_posting_state(
+            $attachment_ids,
+            $requested_checked_ids,
+            $requested_forced_ids
+        );
+
+        $page_data['S_ADMINHELPER_ATTACHMENT_AI_POSTING'] = true;
+        $page_data['ADMINHELPER_AI_ATTACHMENT_IDS'] = implode(',', $posting_state['checked_ids']);
+        $page_data['ADMINHELPER_AI_FORCED_ATTACHMENT_IDS'] = implode(',', $posting_state['forced_ids']);
+        $page_data['ADMINHELPER_AI_ATTACHMENT_STATE_B64'] = !empty($posting_state['states'])
+            ? base64_encode((string) json_encode($posting_state['states']))
+            : '';
+
+        $event['page_data'] = $page_data;
+    }
+
+    public function handle_attachment_ai_upload_data($event)
+    {
+        $attachment_data = $event['attachment_data'];
+        if (!is_array($attachment_data) || empty($attachment_data)) {
+            return;
+        }
+
+        $new_entry = reset($attachment_data);
+        $attach_id = (int) (($new_entry['attach_id'] ?? 0));
+        if ($attach_id <= 0) {
+            return;
+        }
+
+        $state = $this->attachment_ai_manager->record_attachment_scan_by_id($attach_id);
+        if (empty($state)) {
+            return;
+        }
+
+        foreach ($attachment_data as &$entry) {
+            if ((int) ($entry['attach_id'] ?? 0) !== $attach_id) {
+                continue;
+            }
+
+            $entry['adminhelper_ai_generated'] = !empty($state['is_ai_generated']) ? 1 : 0;
+            $entry['adminhelper_ai_forced'] = !empty($state['is_forced']) ? 1 : 0;
+            $entry['adminhelper_ai_provider'] = (string) ($state['ai_provider'] ?? '');
+            $entry['adminhelper_ai_source'] = (string) ($state['detection_source'] ?? '');
+            $entry['adminhelper_ai_reason'] = (string) ($state['detection_reason'] ?? '');
+            $entry['adminhelper_ai_scan_status'] = (string) ($state['scan_status'] ?? '');
+            break;
+        }
+        unset($entry);
+
+        $event['attachment_data'] = $attachment_data;
+    }
+
+    public function sync_attachment_ai_submission($event)
+    {
+        $data = $event['data'];
+        if (!is_array($data)) {
+            return;
+        }
+
+        $post_id = (int) ($data['post_id'] ?? 0);
+        $user_id = (int) ($data['poster_id'] ?? ($this->user->data['user_id'] ?? 0));
+        if ($post_id <= 0) {
+            return;
+        }
+
+        $checked_ids = $this->attachment_ai_manager->parse_attachment_id_csv(
+            $this->request->variable('geoexplo_ai_generated_attachment_ids', '', true)
+        );
+        $this->attachment_ai_manager->sync_post_flags($post_id, $user_id, $checked_ids);
+    }
+
+    public function on_parse_attachment_ai_warning($event)
+    {
+        $attachment = (array) ($event['attachment'] ?? []);
+        if (empty($attachment) || !$this->attachment_ai_manager->is_image_attachment($attachment)) {
+            return;
+        }
+
+        $attach_id = (int) ($attachment['attach_id'] ?? 0);
+        if ($attach_id <= 0) {
+            return;
+        }
+
+        $state = $this->attachment_ai_manager->get_attachment_state_by_id($attach_id, true);
+        if (empty($state['is_ai_generated'])) {
+            return;
+        }
+
+        $this->load_language();
+
+        $block_array = $event['block_array'];
+        $block_array['S_ADMINHELPER_AI_WARNING'] = true;
+        $provider_label = $this->attachment_ai_provider_label((string) ($state['ai_provider'] ?? ''));
+        if ($provider_label !== '') {
+            $block_array['ADMINHELPER_AI_PROVIDER_NOTICE'] = $this->language->lang(
+                'ADMINHELPER_AI_ATTACHMENT_DETECTED_SOURCE',
+                $provider_label
+            );
+        }
+        $event['block_array'] = $block_array;
+    }
+
+    private function attachment_ai_provider_label($provider)
+    {
+        $key = 'ADMINHELPER_AI_PROVIDER_' . strtoupper((string) $provider);
+        if (isset($this->user->lang[$key])) {
+            return $this->language->lang($key);
+        }
+
+        return '';
     }
 
     /**
@@ -1748,6 +1892,28 @@ class listener implements EventSubscriberInterface
             return 'fa-file-text-o';
         }
         return 'fa-paperclip';
+    }
+
+    private function get_requested_attachment_ids()
+    {
+        $raw = $_POST['attachment_data'] ?? $_REQUEST['attachment_data'] ?? [];
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        $ids = [];
+        foreach ($raw as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $attach_id = (int) ($entry['attach_id'] ?? 0);
+            if ($attach_id > 0) {
+                $ids[$attach_id] = $attach_id;
+            }
+        }
+
+        return array_values($ids);
     }
 
     private function load_language()

@@ -1,0 +1,64 @@
+<!-- IF S_ADMINHELPER_ATTACHMENT_AI_POSTING -->
+<div class="panel bg2" id="adminhelper-ai-upload-panel"
+	data-label="{L_ADMINHELPER_AI_ATTACHMENT_LABEL}"
+	data-locked-label="{L_ADMINHELPER_AI_ATTACHMENT_AUTO_LOCKED}"
+	data-via-label="{L_ADMINHELPER_AI_ATTACHMENT_VIA}"
+	data-source-c2pa="{L_ADMINHELPER_AI_SOURCE_C2PA}"
+	data-source-metadata="{L_ADMINHELPER_AI_SOURCE_METADATA}"
+	data-source-prompt="{L_ADMINHELPER_AI_SOURCE_PROMPT}"
+	data-provider-gemini="{L_ADMINHELPER_AI_PROVIDER_GEMINI}"
+	data-provider-chatgpt="{L_ADMINHELPER_AI_PROVIDER_CHATGPT}"
+	data-provider-grok="{L_ADMINHELPER_AI_PROVIDER_GROK}"
+	data-provider-dall_e="{L_ADMINHELPER_AI_PROVIDER_DALL_E}"
+	data-provider-midjourney="{L_ADMINHELPER_AI_PROVIDER_MIDJOURNEY}"
+	data-provider-stable_diffusion="{L_ADMINHELPER_AI_PROVIDER_STABLE_DIFFUSION}"
+	data-provider-comfyui="{L_ADMINHELPER_AI_PROVIDER_COMFYUI}"
+	data-provider-adobe_firefly="{L_ADMINHELPER_AI_PROVIDER_ADOBE_FIREFLY}"
+	data-provider-imagen="{L_ADMINHELPER_AI_PROVIDER_IMAGEN}"
+	data-provider-black_forest_labs="{L_ADMINHELPER_AI_PROVIDER_BLACK_FOREST_LABS}"
+	data-provider-flux="{L_ADMINHELPER_AI_PROVIDER_FLUX}"
+	data-provider-leonardo="{L_ADMINHELPER_AI_PROVIDER_LEONARDO}"
+	data-provider-ideogram="{L_ADMINHELPER_AI_PROVIDER_IDEOGRAM}"
+	data-provider-invokeai="{L_ADMINHELPER_AI_PROVIDER_INVOKEAI}"
+	data-provider-automatic1111="{L_ADMINHELPER_AI_PROVIDER_AUTOMATIC1111}"
+	data-provider-novelai="{L_ADMINHELPER_AI_PROVIDER_NOVELAI}"
+	data-provider-playgroundai="{L_ADMINHELPER_AI_PROVIDER_PLAYGROUNDAI}"
+	data-provider-openai="{L_ADMINHELPER_AI_PROVIDER_OPENAI}">
+	<div class="inner">
+		<fieldset class="fields2">
+			<dl>
+				<dt>&nbsp;</dt>
+				<dd>
+					<p class="geoexplo-hint">{L_ADMINHELPER_AI_ATTACHMENT_HINT}</p>
+					<input type="hidden" id="geoexplo_ai_generated_attachment_ids" name="geoexplo_ai_generated_attachment_ids" value="{ADMINHELPER_AI_ATTACHMENT_IDS}" />
+					<input type="hidden" id="geoexplo_ai_forced_attachment_ids" name="geoexplo_ai_forced_attachment_ids" value="{ADMINHELPER_AI_FORCED_ATTACHMENT_IDS}" />
+					<input type="hidden" id="adminhelper_ai_attachment_state_b64" value="{ADMINHELPER_AI_ATTACHMENT_STATE_B64}" />
+				</dd>
+			</dl>
+		</fieldset>
+	</div>
+</div>
+<style>
+.adminhelper-ai-attach-control {
+	margin-top: 6px;
+	padding-top: 6px;
+	border-top: 1px dashed #d9d9d9;
+}
+.adminhelper-ai-attach-control label {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 600;
+}
+.adminhelper-ai-attach-control input[disabled] + span {
+	opacity: 1;
+}
+.adminhelper-ai-attach-status {
+	display: block;
+	margin-top: 3px;
+	font-size: 11px;
+	color: #9a5c00;
+}
+</style>
+<script src="{ROOT_PATH}ext/bastien59960/adminhelper/styles/all/template/adminhelper_ai_posting.js"></script>
+<!-- ENDIF -->

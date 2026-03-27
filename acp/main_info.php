@@ -39,6 +39,11 @@ class main_info
                     'auth' => 'ext_bastien59960/adminhelper && acl_a_board',
                     'cat' => ['ACP_ADMINHELPER_TITLE'],
                 ],
+                'attachment_ai' => [
+                    'title' => 'ACP_ADMINHELPER_ATTACHMENT_AI',
+                    'auth' => 'ext_bastien59960/adminhelper && acl_a_board',
+                    'cat' => ['ACP_ADMINHELPER_TITLE'],
+                ],
             ],
         ];
     }

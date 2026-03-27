@@ -1,9 +1,9 @@
 {
     "name": "bastien59960/adminhelper",
     "type": "phpbb-extension",
-    "description": "Ajoute un champ de recherche par email dans la gestion des membres de l'ACP phpBB.",
+    "description": "Admin and moderation helper utilities for phpBB: safer email, audit logs, moderation notes, search improvements, and AI attachment detection.",
     "homepage": "https://github.com/Bastien59960/phpbb-adminhelper",
-    "version": "1.0.2",
+    "version": "1.0.5",
     "license": "GPL-2.0-only",
     "authors": [
         {
