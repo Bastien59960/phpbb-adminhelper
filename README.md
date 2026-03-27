@@ -32,6 +32,7 @@ Admin Helper can mark image attachments as AI-generated and show a public warnin
 - A manual checkbox lets posters declare that an image is AI-generated.
 - Strong technical signatures are auto-detected at upload time and during batch scans.
 - When detection is reliable, the checkbox is auto-checked and locked.
+- The posting/editing page does not run bulk scans; it only reuses stored state and lightweight attachment metadata.
 - The detected AI source is shown publicly only when it is identified automatically from the file itself.
 - Current strong signals include C2PA / Content Credentials, known AI-tool metadata, and preserved prompt/parameter payloads.
 - Existing images can be scanned in bulk from ACP or CLI.
@@ -40,6 +41,7 @@ Admin Helper can mark image attachments as AI-generated and show a public warnin
 
 - `Gemini` can be identified when Google/Gemini C2PA markers are present.
 - `ChatGPT` can be identified when OpenAI / ChatGPT C2PA or metadata markers are present.
+- The generic "AI-generated image" flag may still be declared manually by the poster.
 - No AI source is assigned manually by the extension. If the file does not prove the source, the forum only shows the generic AI warning.
 
 ### CLI

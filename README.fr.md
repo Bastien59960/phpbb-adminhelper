@@ -32,6 +32,7 @@ Admin Helper peut marquer les pièces jointes image comme générées par IA et 
 - Une case manuelle permet au posteur de déclarer qu'une image a été générée par IA.
 - Les signatures techniques fortes sont détectées automatiquement à l'upload et pendant les scans batch.
 - Quand la détection est fiable, la case est cochée et verrouillée automatiquement.
+- La page de publication / modification ne lance pas de scan massif ; elle réutilise seulement l'état déjà stocké et des métadonnées légères des pièces jointes.
 - La source IA détectée n'est affichée publiquement que lorsqu'elle est identifiée automatiquement à partir du fichier lui-même.
 - Les signaux forts actuellement exploités incluent C2PA / Content Credentials, les métadonnées d'outils IA connus, et les prompts/paramètres conservés dans le fichier.
 - Les images existantes peuvent être rescannées en masse depuis l'ACP ou en CLI.
@@ -40,6 +41,7 @@ Admin Helper peut marquer les pièces jointes image comme générées par IA et 
 
 - `Gemini` peut être identifié quand les marqueurs C2PA Google/Gemini sont présents.
 - `ChatGPT` peut être identifié quand les marqueurs C2PA ou métadonnées OpenAI / ChatGPT sont présents.
+- Le marquage générique "image générée par IA" peut toujours être déclaré manuellement par le posteur.
 - Aucune source IA n'est attribuée manuellement par l'extension. Si le fichier ne prouve pas la source, le forum n'affiche que l'avertissement IA générique.
 
 ### CLI
