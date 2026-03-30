@@ -1896,7 +1896,7 @@ class listener implements EventSubscriberInterface
 
     private function get_requested_attachment_ids()
     {
-        $raw = $_POST['attachment_data'] ?? $_REQUEST['attachment_data'] ?? [];
+        $raw = $this->request->variable('attachment_data', [['attach_id' => 0]], true);
         if (!is_array($raw)) {
             return [];
         }

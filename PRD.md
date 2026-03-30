@@ -1,6 +1,6 @@
 # PRD — bastien59960/adminhelper
 
-**Dernière mise à jour :** 2026-03-27  
+**Dernière mise à jour :** 2026-03-30
 **Extension :** `ext/bastien59960/adminhelper`  
 **Version courante :** 1.0.5
 
@@ -142,6 +142,23 @@ styles/all/template/event/posting_attach_body_file_list_after.html
 styles/all/template/adminhelper_ai_posting.js
 styles/all/template/event/attachment_file_append.html
 ```
+
+## Correctifs
+
+### `get_requested_attachment_ids()` — accès `$_POST` direct (2026-03-30)
+
+**Symptôme :** Erreur 503 "Illegal use of $_POST" lors de la prévisualisation d'un post existant
+après ajout d'une pièce jointe. Le flux *soumettre sans prévisualiser* ne déclenchait pas l'erreur
+car l'event `inject_attachment_ai_posting_vars` n'est appelé que sur les pages de type posting
+(preview inclus), pas sur le traitement final.
+
+**Cause :** `get_requested_attachment_ids()` lisait `$_POST['attachment_data']` directement.
+phpBB remplace `$_POST` par un objet proxy `deactivated_super_global` ; tout accès direct lève une
+exception fatale.
+
+**Correctif :** Remplacement par `$this->request->variable('attachment_data', [['attach_id' => 0]], true)`.
+Le template `[['attach_id' => 0]]` indique à phpBB de parser un tableau de tableaux en castant
+`attach_id` en entier. Le troisième argument `true` cible explicitement POST.
 
 ## Contraintes et non-objectifs
 
