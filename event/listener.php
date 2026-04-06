@@ -91,6 +91,7 @@ class listener implements EventSubscriberInterface
             'core.page_header'                                 => 'on_page_header',
             'core.viewtopic_post_row_after'                    => 'on_viewtopic_post_row',
             'core.parse_attachments_modify_template_data'      => 'on_parse_attachment_ai_warning',
+            'core.submit_post_before'                          => 'normalize_post_urls',
         ];
     }
 
@@ -2018,5 +2019,61 @@ class listener implements EventSubscriberInterface
             'ADMINHELPER_U_DELETE_NOTE' => $u_delete,
             'ADMINHELPER_POST_ID_NOTE'  => $post_id,
         ], true, 'change');
+    }
+
+    /**
+     * Normalise les entités HTML sur-encodées dans les URLs BBCode avant stockage.
+     * Corrige les cas de copier-coller depuis du HTML ou des apps de messagerie
+     * qui peuvent encoder & → &amp; plusieurs fois avant soumission au forum.
+     */
+    public function normalize_post_urls($event)
+    {
+        $data = $event['data'];
+        $message = $data['message'];
+        $message = $this->fix_bbcode_url_encoding($message);
+        $data['message'] = $message;
+        $event['data'] = $data;
+    }
+
+    private function fix_bbcode_url_encoding(string $text): string
+    {
+        // [url=https://...] et [url="https://..."]
+        $text = preg_replace_callback(
+            '/\[url=([^\]]*)\]/i',
+            function ($m) {
+                return '[url=' . $this->decode_entities_url($m[1]) . ']';
+            },
+            $text
+        );
+
+        // [img]https://...[/img]
+        $text = preg_replace_callback(
+            '/(\[img\])(https?:\/\/[^\[]+)(\[\/img\])/i',
+            function ($m) {
+                return $m[1] . $this->decode_entities_url($m[2]) . $m[3];
+            },
+            $text
+        );
+
+        // [url]https://...[/url]
+        $text = preg_replace_callback(
+            '/(\[url\])(https?:\/\/[^\[]+)(\[\/url\])/i',
+            function ($m) {
+                return $m[1] . $this->decode_entities_url($m[2]) . $m[3];
+            },
+            $text
+        );
+
+        return $text;
+    }
+
+    private function decode_entities_url(string $url): string
+    {
+        $prev = null;
+        while ($prev !== $url) {
+            $prev = $url;
+            $url = html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+        return $url;
     }
 }

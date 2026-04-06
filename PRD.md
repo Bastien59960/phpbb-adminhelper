@@ -1,6 +1,6 @@
 # PRD — bastien59960/adminhelper
 
-**Dernière mise à jour :** 2026-03-30
+**Dernière mise à jour :** 2026-04-06
 **Extension :** `ext/bastien59960/adminhelper`  
 **Version courante :** 1.0.5
 
@@ -159,6 +159,28 @@ exception fatale.
 **Correctif :** Remplacement par `$this->request->variable('attachment_data', [['attach_id' => 0]], true)`.
 Le template `[['attach_id' => 0]]` indique à phpBB de parser un tableau de tableaux en castant
 `attach_id` en entier. Le troisième argument `true` cible explicitement POST.
+
+### Normalisation des entités HTML dans les URLs BBCode (2026-04-06)
+
+**Symptôme :** Des liens `[url=]` et `[img]` dans des posts affichaient des URLs cassées contenant
+`&amp;quot;` ou `&amp;amp;amp;` au lieu d'un `&` ou `"` simple. Les liens étaient non-cliquables
+ou pointaient vers une adresse invalide.
+
+**Cause :** Copier-coller depuis du HTML rendu (pages web, apps de messagerie, Word) où `&` est
+déjà encodé en `&amp;`. À chaque rebond supplémentaire (WhatsApp → copier → forum), un niveau
+d'encodage s'ajoute. phpBB/s9e TextFormatter stocke ensuite le tout en XML (ajoutant encore un
+niveau), résultant en `&amp;amp;amp;` voire 7 niveaux d'encodage sur des cas extrêmes.
+
+**Posts affectés (corrigés manuellement en base) :**
+- post_id 233609 (topic 21422) — URL CDN tbauctions avec `?&imageFormat=webp` (3 niveaux)
+- post_id 234623 (topic 21548) — URL download forum avec `?id=X&mode=view` (3 niveaux)
+- post_id 233615 (topic 21423) — URL Google Maps avec 7 niveaux (corrigé par l'admin)
+
+**Correctif préventif :** Hook `core.submit_post_before` dans `event/listener.php` :
+méthodes `normalize_post_urls()`, `fix_bbcode_url_encoding()`, `decode_entities_url()`.
+Avant toute soumission de post, les BBCodes `[url=…]`, `[img]…[/img]`, `[url]…[/url]`
+sont passés dans une boucle `html_entity_decode()` jusqu'à stabilité, supprimant tous les
+niveaux de sur-encodage. **Aucun fichier phpBB core modifié** — tout est dans cette extension.
 
 ## Contraintes et non-objectifs
 
