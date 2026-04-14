@@ -41,9 +41,33 @@
     var useHtml = document.getElementById('adminhelper_use_html');
     var htmlField = document.getElementById('adminhelper_message_html');
     var textField = document.getElementById('message');
+    var oneClickBox = document.getElementById('adminhelper_enable_one_click');
+    var sendImmediatelyBox = document.querySelector('input[name="send_immediately"]');
 
     if (!form || !useHtml || !htmlField || !textField) {
         return;
+    }
+
+    // One-click requires queue mode: disable "send immediately" when one-click is active.
+    // (The phpBB messenger is instantiated before core.acp_email_send_before fires,
+    // so forcing use_queue in the event cannot override an already-created non-queue messenger.)
+    function syncOneClickVsSendImmediately() {
+        if (!oneClickBox || !sendImmediatelyBox) {
+            return;
+        }
+        if (oneClickBox.checked) {
+            sendImmediatelyBox.checked = false;
+            sendImmediatelyBox.disabled = true;
+            sendImmediatelyBox.title = 'Désactivé : la désinscription one-click nécessite le mode file d\'attente.';
+        } else {
+            sendImmediatelyBox.disabled = false;
+            sendImmediatelyBox.title = '';
+        }
+    }
+
+    if (oneClickBox) {
+        oneClickBox.addEventListener('change', syncOneClickVsSendImmediately);
+        syncOneClickVsSendImmediately();
     }
 
     form.addEventListener('submit', function () {

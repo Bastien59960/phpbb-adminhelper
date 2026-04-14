@@ -26,6 +26,12 @@ class main_module
             return;
         }
 
+        if ($mode === 'forum_gate')
+        {
+            $this->handle_forum_gate_mode($db, $template, $user, $request, $table_prefix, $phpbb_container);
+            return;
+        }
+
         $this->tpl_name = 'acp_adminhelper_unsubscribe_log';
         $this->page_title = $user->lang('ACP_ADMINHELPER_UNSUBSCRIBE_LOGS');
 
@@ -273,6 +279,50 @@ class main_module
 
             trigger_error($user->lang('ACP_ADMINHELPER_RESTORE_REACTIONS_NOTIFY_SUCCESS') . adm_back_link($this->u_action));
         }
+        else if ($action === 'restore_massmail')
+        {
+            $restore_user_id = (int) $request->variable('uid', 0);
+            $hash = (string) $request->variable('hash', '', true);
+
+            if ($restore_user_id <= ANONYMOUS || !check_link_hash($hash, 'adminhelper_restore_massmail_' . $restore_user_id))
+            {
+                trigger_error($user->lang('FORM_INVALID') . adm_back_link($this->u_action), E_USER_WARNING);
+            }
+
+            $sql = 'SELECT user_id, user_type, user_email
+                FROM ' . USERS_TABLE . '
+                WHERE user_id = ' . $restore_user_id;
+            $result = $db->sql_query($sql);
+            $restore_user = $db->sql_fetchrow($result);
+            $db->sql_freeresult($result);
+
+            if (!$restore_user || (int) $restore_user['user_type'] === USER_IGNORE)
+            {
+                trigger_error($user->lang('ACP_ADMINHELPER_RESTORE_NOTIFY_INVALID_USER') . adm_back_link($this->u_action), E_USER_WARNING);
+            }
+
+            $sql = 'UPDATE ' . USERS_TABLE . '
+                SET user_allow_massemail = 1
+                WHERE user_id = ' . $restore_user_id;
+            $db->sql_query($sql);
+
+            $log_data = [
+                'user_id' => $restore_user_id,
+                'user_email' => substr((string) $restore_user['user_email'], 0, 255),
+                'unsubscribe_type' => 'massmail',
+                'token_expires_at' => 0,
+                'http_status' => 200,
+                'event_status' => 'admin_restored',
+                'request_method' => 'ADMIN',
+                'request_ip' => substr((string) $request->server('REMOTE_ADDR', ''), 0, 40),
+                'request_user_agent' => substr((string) $request->server('HTTP_USER_AGENT', ''), 0, 255),
+                'logged_at' => time(),
+            ];
+            $sql = 'INSERT INTO ' . $log_table . ' ' . $db->sql_build_array('INSERT', $log_data);
+            $db->sql_query($sql);
+
+            trigger_error($user->lang('ACP_ADMINHELPER_RESTORE_MASSMAIL_SUCCESS') . adm_back_link($this->u_action));
+        }
 
         $sql = 'SELECT COUNT(user_id) AS total_members,
                        SUM(CASE WHEN user_allow_massemail = 1 THEN 1 ELSE 0 END) AS massmail_subscribed,
@@ -413,15 +463,20 @@ class main_module
             $user_id = (int) $row['user_id'];
             $username = trim((string) ($row['username'] ?? ''));
             $user_label = '-';
+            $user_id_label = '';
             if ($user_id > 0)
             {
-                $user_label = $username !== '' ? ($username . ':' . $user_id) : (string) $user_id;
+                $user_label = $username !== '' ? $username : 'ID:' . $user_id;
+                $user_id_label = '#' . $user_id;
             }
             $request_user_agent = trim((string) $row['request_user_agent']);
+            $event_status = (string) $row['event_status'];
 
             $can_restore_forum_notify = ($unsubscribe_type === 'forum_notify' && $user_id > ANONYMOUS);
             $can_restore_reactions_notify = ($unsubscribe_type === 'reactions_notify' && $user_id > ANONYMOUS);
-            $can_restore_notify = $can_restore_forum_notify || $can_restore_reactions_notify;
+            $can_restore_massmail = ($unsubscribe_type === 'massmail' && $user_id > ANONYMOUS
+                && in_array($event_status, ['unsubscribed', 'already_unsubscribed', 'manual_unsubscribed'], true));
+            $can_restore_notify = $can_restore_forum_notify || $can_restore_reactions_notify || $can_restore_massmail;
             $restore_url = '';
             if ($can_restore_forum_notify)
             {
@@ -437,6 +492,26 @@ class main_module
                     'action=restore_reactions_notify&uid=' . $user_id . '&hash=' . generate_link_hash('adminhelper_restore_reactions_notify_' . $user_id)
                 );
             }
+            else if ($can_restore_massmail)
+            {
+                $restore_url = append_sid(
+                    $this->u_action,
+                    'action=restore_massmail&uid=' . $user_id . '&hash=' . generate_link_hash('adminhelper_restore_massmail_' . $user_id)
+                );
+            }
+
+            if ($can_restore_massmail)
+            {
+                $restore_confirm = $user->lang('ACP_ADMINHELPER_RESTORE_MASSMAIL_CONFIRM');
+            }
+            else if ($can_restore_reactions_notify)
+            {
+                $restore_confirm = $user->lang('ACP_ADMINHELPER_RESTORE_REACTIONS_NOTIFY_CONFIRM');
+            }
+            else
+            {
+                $restore_confirm = $user->lang('ACP_ADMINHELPER_RESTORE_NOTIFY_CONFIRM');
+            }
 
             $template->assign_block_vars('logs', [
                 'LOG_ID' => (int) $row['log_id'],
@@ -444,21 +519,17 @@ class main_module
                 'TYPE_LABEL' => $type_label,
                 'STATUS_LABEL' => $status_label,
                 'USER_LABEL' => $user_label,
-                'USER_ID' => $user_label,
+                'USER_ID_LABEL' => $user_id_label,
                 'U_USER_PROFILE' => $user_id > 0 ? append_sid("{$phpbb_root_path}memberlist.$phpEx", 'mode=viewprofile&u=' . $user_id) : '',
                 'USER_EMAIL' => (string) $row['user_email'] !== '' ? (string) $row['user_email'] : '-',
-                'HTTP_STATUS' => (int) $row['http_status'] > 0 ? (int) $row['http_status'] : '-',
                 'REQUEST_METHOD' => (string) $row['request_method'] !== '' ? (string) $row['request_method'] : '-',
                 'REQUEST_IP' => (string) $row['request_ip'] !== '' ? (string) $row['request_ip'] : '-',
-                'TOKEN_EXPIRES_AT' => ((int) $row['token_expires_at'] > 0) ? $user->format_date((int) $row['token_expires_at']) : '-',
                 'USER_AGENT' => $request_user_agent !== '' ? $request_user_agent : '-',
                 'USER_AGENT_SHORT' => (strlen($request_user_agent) > 80) ? substr($request_user_agent, 0, 80) . '...' : ($request_user_agent !== '' ? $request_user_agent : '-'),
                 'CAN_RESTORE_NOTIFY' => $can_restore_notify,
                 'U_RESTORE_NOTIFY' => $restore_url,
                 'RESTORE_NOTIFY_LABEL' => $user->lang('ACP_ADMINHELPER_ACTION_RESTORE_NOTIFY'),
-                'RESTORE_NOTIFY_CONFIRM' => $can_restore_reactions_notify
-                    ? $user->lang('ACP_ADMINHELPER_RESTORE_REACTIONS_NOTIFY_CONFIRM')
-                    : $user->lang('ACP_ADMINHELPER_RESTORE_NOTIFY_CONFIRM'),
+                'RESTORE_NOTIFY_CONFIRM' => $restore_confirm,
                 'ACTION_NONE_LABEL' => $user->lang('ACP_ADMINHELPER_ACTION_NONE'),
             ]);
         }
@@ -592,5 +663,207 @@ class main_module
         }
 
         return (string) $reason !== '' ? (string) $reason : '-';
+    }
+
+    // -------------------------------------------------------------------------
+    // Forum gate
+    // -------------------------------------------------------------------------
+
+    private function handle_forum_gate_mode($db, $template, $user, $request, $table_prefix, $phpbb_container)
+    {
+        $this->tpl_name  = 'acp_adminhelper_forum_gate';
+        $this->page_title = $user->lang('ACP_FORUM_GATE_TITLE');
+
+        $gate_table   = $table_prefix . 'adminhelper_forum_gate';
+        $forums_table = $table_prefix . 'forums';
+        $config       = $phpbb_container->get('config');
+
+        add_form_key('adminhelper_forum_gate');
+
+        // ── POST : sauvegarde ────────────────────────────────────────────────
+        if ($request->is_set_post('submit_gate'))
+        {
+            if (!check_form_key('adminhelper_forum_gate'))
+            {
+                trigger_error($user->lang('FORM_INVALID') . adm_back_link($this->u_action), E_USER_WARNING);
+            }
+
+            // Configs globales
+            $config->set('bastien59960_adminhelper_gate_enabled',
+                $request->variable('gate_enabled', 0) ? 1 : 0);
+            $config->set('bastien59960_adminhelper_gate_presentation_forum_id',
+                max(0, (int) $request->variable('gate_presentation_forum_id', 14)));
+            $config->set('bastien59960_adminhelper_gate_default_min_posts',
+                max(0, (int) $request->variable('gate_default_min_posts', 1)));
+            $config->set('bastien59960_adminhelper_gate_default_guest_hidden',
+                $request->variable('gate_default_guest_hidden', 0) ? 1 : 0);
+
+            // Règles par forum : supprimer tout puis ré-insérer
+            $db->sql_query('DELETE FROM ' . $gate_table);
+
+            // Récupérer tous les forum_ids pour itérer
+            $sql = 'SELECT forum_id FROM ' . $forums_table . ' WHERE forum_id > 0';
+            $result = $db->sql_query($sql);
+            $all_fids = [];
+            while ($row = $db->sql_fetchrow($result))
+            {
+                $all_fids[] = (int) $row['forum_id'];
+            }
+            $db->sql_freeresult($result);
+
+            foreach ($all_fids as $fid)
+            {
+                // select guest : "" = hérité, "0" = visible explicite, "1" = caché explicite
+                $guest_str = $request->variable('gate_guest_' . $fid, '');
+                // input min : "" = hérité, "0" = exempté, N = seuil
+                $min_str   = $request->variable('gate_min_' . $fid, '');
+
+                // Si les deux sont "vides" (= héritage), on ne sauvegarde pas de ligne
+                if ($guest_str === '' && $min_str === '')
+                {
+                    continue;
+                }
+
+                $guest_hidden = ($guest_str === '1') ? 1 : 0;
+                $min_posts    = ($min_str !== '') ? max(0, (int) $min_str) : 0;
+
+                $db->sql_query(
+                    'INSERT INTO ' . $gate_table . ' (forum_id, guest_hidden, min_posts_member)' .
+                    ' VALUES (' . $fid . ', ' . $guest_hidden . ', ' . $min_posts . ')'
+                );
+            }
+
+            // Vider le cache phpBB (les configs sont cachées)
+            $phpbb_container->get('cache.driver')->purge();
+
+            trigger_error($user->lang('ACP_FORUM_GATE_SAVED') . adm_back_link($this->u_action));
+        }
+
+        // ── GET : affichage ──────────────────────────────────────────────────
+
+        // Règles explicites existantes
+        $rules = [];
+        $result = $db->sql_query('SELECT forum_id, guest_hidden, min_posts_member FROM ' . $gate_table);
+        while ($row = $db->sql_fetchrow($result))
+        {
+            $rules[(int) $row['forum_id']] = [
+                'guest_hidden'     => (int) $row['guest_hidden'],
+                'min_posts_member' => (int) $row['min_posts_member'],
+            ];
+        }
+        $db->sql_freeresult($result);
+
+        // Arborescence des forums (tri left_id = ordre d'affichage naturel)
+        $forums = [];
+        $result = $db->sql_query(
+            'SELECT forum_id, forum_name, parent_id, left_id, right_id, forum_type' .
+            ' FROM ' . $forums_table . ' ORDER BY left_id ASC'
+        );
+        while ($row = $db->sql_fetchrow($result))
+        {
+            $forums[] = $row;
+        }
+        $db->sql_freeresult($result);
+
+        // Map forum_id → parent_id (pour la résolution d'héritage)
+        $forum_map = [];
+        foreach ($forums as $f)
+        {
+            $forum_map[(int) $f['forum_id']] = (int) $f['parent_id'];
+        }
+
+        // Configs courantes
+        $default_min   = (int) $config['bastien59960_adminhelper_gate_default_min_posts'];
+        $default_guest = (int) $config['bastien59960_adminhelper_gate_default_guest_hidden'];
+        $pres_forum_id = (int) $config['bastien59960_adminhelper_gate_presentation_forum_id'];
+
+        $template->assign_vars([
+            'U_ACTION'                => $this->u_action,
+            'GATE_ENABLED'            => (int) $config['bastien59960_adminhelper_gate_enabled'],
+            'GATE_PRESENTATION_FORUM_ID' => $pres_forum_id,
+            'GATE_DEFAULT_MIN_POSTS'  => $default_min,
+            'GATE_DEFAULT_GUEST_HIDDEN' => $default_guest,
+        ]);
+
+        // Forum select (pour le champ "forum de présentation")
+        foreach ($forums as $f)
+        {
+            $template->assign_block_vars('forum_select_rows', [
+                'FORUM_ID' => (int) $f['forum_id'],
+                'FORUM_NAME' => str_repeat('  ', $this->forum_depth_from_map((int) $f['forum_id'], $forum_map)) . $f['forum_name'],
+                'SELECTED'   => ((int) $f['forum_id'] === $pres_forum_id),
+            ]);
+        }
+
+        // Tableau des règles avec calcul de profondeur via nested-set
+        $depth_stack = [];
+        foreach ($forums as $f)
+        {
+            $fid   = (int) $f['forum_id'];
+            $left  = (int) $f['left_id'];
+            $right = (int) $f['right_id'];
+
+            // Dépiler les forums dont le right_id est dépassé
+            while (!empty($depth_stack) && end($depth_stack) < $left)
+            {
+                array_pop($depth_stack);
+            }
+            $depth = count($depth_stack);
+            $depth_stack[] = $right;
+
+            $has_explicit = isset($rules[$fid]);
+
+            // Valeur héritée (parent → racine → défaut global)
+            $inh_guest = $this->gate_inherited_value($fid, 'guest_hidden', $rules, $forum_map, $default_guest);
+            $inh_min   = $this->gate_inherited_value($fid, 'min_posts_member', $rules, $forum_map, $default_min);
+
+            $template->assign_block_vars('forum_gate_rows', [
+                'FORUM_ID'              => $fid,
+                'FORUM_NAME'            => $f['forum_name'],
+                'FORUM_TYPE'            => (int) $f['forum_type'],
+                'DEPTH'                 => $depth,
+                'DEPTH_PX'              => $depth * 16,
+                'HAS_EXPLICIT'          => $has_explicit,
+                'EXPLICIT_GUEST_HIDDEN' => $has_explicit ? (int) $rules[$fid]['guest_hidden'] : 0,
+                'EXPLICIT_MIN_POSTS'    => $has_explicit ? (int) $rules[$fid]['min_posts_member'] : 0,
+                'INHERITED_GUEST_HIDDEN'=> $inh_guest,
+                'INHERITED_MIN_POSTS'   => $inh_min,
+            ]);
+        }
+    }
+
+    /**
+     * Remonte la chaîne de parents pour trouver la valeur héritée d'un champ gate.
+     * Ne regarde PAS le forum lui-même (on cherche ce que le parent transmet).
+     */
+    private function gate_inherited_value($forum_id, $field, array $rules, array $forum_map, $global_default)
+    {
+        $parent_id = $forum_map[$forum_id] ?? 0;
+        if ($parent_id <= 0)
+        {
+            return (int) $global_default;
+        }
+        if (isset($rules[$parent_id]))
+        {
+            return (int) $rules[$parent_id][$field];
+        }
+        return $this->gate_inherited_value($parent_id, $field, $rules, $forum_map, $global_default);
+    }
+
+    /**
+     * Calcule la profondeur d'un forum via la map parent_id (fallback non nested-set).
+     */
+    private function forum_depth_from_map($forum_id, array $forum_map, $max = 8)
+    {
+        $depth = 0;
+        $current = $forum_id;
+        while ($depth < $max)
+        {
+            $parent = $forum_map[$current] ?? 0;
+            if ($parent <= 0) break;
+            $depth++;
+            $current = $parent;
+        }
+        return $depth;
     }
 }

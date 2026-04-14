@@ -44,6 +44,11 @@ class main_info
                     'auth' => 'ext_bastien59960/adminhelper && acl_a_board',
                     'cat' => ['ACP_ADMINHELPER_TITLE'],
                 ],
+                'forum_gate' => [
+                    'title' => 'ACP_FORUM_GATE_TITLE',
+                    'auth' => 'ext_bastien59960/adminhelper && acl_a_board',
+                    'cat' => ['ACP_ADMINHELPER_TITLE'],
+                ],
             ],
         ];
     }

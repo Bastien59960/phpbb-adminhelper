@@ -39,6 +39,8 @@ $lang = array_merge($lang, [
     'ADMINHELPER_NOTIFY_UNSUB_PAGE_EXPLAIN' => 'Cette action desactive les notifications forum par email. Elle ne supprime pas votre compte forum.',
     'ADMINHELPER_NOTIFY_UNSUB_PAGE_BUTTON' => 'Confirmer la desinscription',
     'ADMINHELPER_MIME_MULTIPART_NOTICE' => 'Ceci est un message multi-parties au format MIME.',
+    'ADMINHELPER_MASS_ONE_CLICK_TEXT' => 'Pour vous desinscrire en un clic (sans connexion requise) : %s',
+    'ADMINHELPER_MASS_ONE_CLICK_HTML' => '<p>Desinscription en un clic (sans connexion requise) : <a href="%1$s">Cliquez ici</a></p>',
 
     // Notes de modération
     'ADMINHELPER_MOD_NOTE_BTN'         => 'Inclure une note de modération',
@@ -90,6 +92,13 @@ $lang = array_merge($lang, [
     'ADMINHELPER_AI_PROVIDER_NOVELAI' => 'NovelAI',
     'ADMINHELPER_AI_PROVIDER_PLAYGROUNDAI' => 'Playground AI',
     'ADMINHELPER_AI_PROVIDER_OPENAI' => 'OpenAI',
+
+    // Forum gate — messages affichés aux visiteurs bloqués
+    'FORUM_GATE_GUEST_BLOCKED'          => 'Cette section est reservee aux membres enregistres. <a href="%1$s">Inscrivez-vous</a> ou <a href="%2$s">connectez-vous</a> pour y acceder.',
+    // Utilisé quand user_posts == 0 : incite à se présenter (lien vers forum de présentation)
+    'FORUM_GATE_MEMBER_BLOCKED'         => 'Pour accéder à cette section, vous devez avoir posté au moins <strong>%1$d message(s)</strong> sur le forum.<br /><br /><strong>Pour débloquer votre accès :</strong> commencez par <a href="%2$s"><strong>vous présenter dans le forum de présentation</strong></a>. Dès que votre message sera validé, cette section vous sera accessible.<br /><br /><strong>Vous pouvez par exemple nous parler :</strong><br />&bull; de vos projets ou de votre recherche de véhicule ;<br />&bull; de votre véhicule actuel, s\'il est en lien avec le thème du forum ;<br />&bull; de vos voyages, escapades ou aventures.<br /><br /><em>Plus votre présentation est personnelle, plus les échanges seront faciles, chaleureux et sympathiques.</em><br /><br /><strong>La rédaction par IA, autre que la simple correction orthographique, est fortement déconseillée.</strong> Si vous devez citer une IA dans vos messages, il faudra le préciser bien visiblement.<br /><br />Si vous avez une question précise, merci d\'éviter de la poser dans votre présentation et de la publier plutôt dans le sous-forum adéquat, s\'il vous plaît.',
+    // Utilisé quand user_posts >= 1 mais < min_posts_member : message simple avec seuil dynamique
+    'FORUM_GATE_MEMBER_BLOCKED_GENERIC' => 'Pour accéder à cette section, vous devez avoir posté au moins <strong>%1$d messages</strong> sur le forum. Continuez à participer pour y accéder.',
 
     'ACP_ADMINHELPER_ATTACHMENT_AI' => 'Images generees par IA',
     'ACP_ADMINHELPER_ATTACHMENT_AI_EXPLAIN' => 'Declaration des images generees par IA sur les pieces jointes du forum. Le scan detecte les signatures fortes (C2PA, outils IA connus, prompts/parametres conserves) et verrouille automatiquement la case publique quand une origine IA est identifiee.',

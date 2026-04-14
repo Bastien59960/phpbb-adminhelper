@@ -16,6 +16,11 @@ class listener implements EventSubscriberInterface
     protected $config;
     protected $attachment_ai_manager;
     protected $mod_notes_table;
+    protected $gate_table;
+    protected $forums_table;
+    protected $gate_rules;
+    protected $gate_forum_map;
+    protected $gate_language_loaded;
     protected $language_loaded;
     protected $search_is_author;
     protected $search_post_attaches;
@@ -50,8 +55,13 @@ class listener implements EventSubscriberInterface
         $this->user = $user;
         $this->config = $config;
         $this->attachment_ai_manager = $attachment_ai_manager;
-        $this->mod_notes_table = $table_prefix . 'adminhelper_mod_notes';
-        $this->language_loaded = false;
+        $this->mod_notes_table    = $table_prefix . 'adminhelper_mod_notes';
+        $this->gate_table         = $table_prefix . 'adminhelper_forum_gate';
+        $this->forums_table       = $table_prefix . 'forums';
+        $this->gate_rules         = null;
+        $this->gate_forum_map     = null;
+        $this->gate_language_loaded = false;
+        $this->language_loaded    = false;
         $this->search_is_author = false;
         $this->search_post_attaches = [];
         $this->mass_email_context = false;
@@ -92,6 +102,8 @@ class listener implements EventSubscriberInterface
             'core.viewtopic_post_row_after'                    => 'on_viewtopic_post_row',
             'core.parse_attachments_modify_template_data'      => 'on_parse_attachment_ai_warning',
             'core.submit_post_before'                          => 'normalize_post_urls',
+            'core.viewforum_modify_page_title'                 => 'forum_gate_check',
+            'core.viewtopic_before_f_read_check'               => 'forum_gate_check',
         ];
     }
 
@@ -495,6 +507,13 @@ class listener implements EventSubscriberInterface
             @set_time_limit(0);
         }
 
+        // Building 3500+ messages in memory requires more than the default 128M.
+        $current_limit = $this->parse_memory_limit((string) ini_get('memory_limit'));
+        if ($current_limit !== -1 && $current_limit < 536870912)
+        {
+            @ini_set('memory_limit', '512M');
+        }
+
         $unsubscribe_url = '';
         $unsubscribe_text_footer = '';
         $unsubscribe_html_footer = '';
@@ -516,6 +535,10 @@ class listener implements EventSubscriberInterface
                     ? (string) $template_data['MESSAGE']
                     : (string) $this->request->variable('message', '', true);
                 $template_data['MESSAGE'] = $this->append_text_footer($current_message, $unsubscribe_text_footer, $unsubscribe_url);
+                if ($enable_one_click)
+                {
+                    $template_data['MESSAGE'] .= "\n\n" . $this->language->lang('ADMINHELPER_MASS_ONE_CLICK_TEXT', '##ADMINHELPER_ONE_CLICK_URL_TEXT##');
+                }
                 $event['template_data'] = $template_data;
             }
             return;
@@ -530,6 +553,10 @@ class listener implements EventSubscriberInterface
                     ? (string) $template_data['MESSAGE']
                     : (string) $this->request->variable('message', '', true);
                 $template_data['MESSAGE'] = $this->append_text_footer($current_message, $unsubscribe_text_footer, $unsubscribe_url);
+                if ($enable_one_click)
+                {
+                    $template_data['MESSAGE'] .= "\n\n" . $this->language->lang('ADMINHELPER_MASS_ONE_CLICK_TEXT', '##ADMINHELPER_ONE_CLICK_URL_TEXT##');
+                }
                 $event['template_data'] = $template_data;
             }
             return;
@@ -545,6 +572,10 @@ class listener implements EventSubscriberInterface
                     ? (string) $template_data['MESSAGE']
                     : (string) $this->request->variable('message', '', true);
                 $template_data['MESSAGE'] = $this->append_text_footer($current_message, $unsubscribe_text_footer, $unsubscribe_url);
+                if ($enable_one_click)
+                {
+                    $template_data['MESSAGE'] .= "\n\n" . $this->language->lang('ADMINHELPER_MASS_ONE_CLICK_TEXT', '##ADMINHELPER_ONE_CLICK_URL_TEXT##');
+                }
                 $event['template_data'] = $template_data;
             }
             return;
@@ -567,6 +598,11 @@ class listener implements EventSubscriberInterface
                 : $plain_text_message;
             $template_data['MESSAGE'] = $this->append_text_footer($current_message, $unsubscribe_text_footer, $unsubscribe_url);
             $html_message = $this->append_html_footer($html_message, $unsubscribe_html_footer, $unsubscribe_url);
+            if ($enable_one_click)
+            {
+                $template_data['MESSAGE'] .= "\n\n" . $this->language->lang('ADMINHELPER_MASS_ONE_CLICK_TEXT', '##ADMINHELPER_ONE_CLICK_URL_TEXT##');
+                $html_message .= "\n" . $this->language->lang('ADMINHELPER_MASS_ONE_CLICK_HTML', '##ADMINHELPER_ONE_CLICK_URL_HTML##');
+            }
         }
 
         $event['template_data'] = $template_data;
@@ -614,8 +650,8 @@ class listener implements EventSubscriberInterface
         $multipart_message = $this->language->lang('ADMINHELPER_MIME_MULTIPART_NOTICE') . "\r\n\r\n";
         $multipart_message .= '--' . $this->mass_email_boundary . "\r\n";
         $multipart_message .= 'Content-Type: text/plain; charset=UTF-8' . "\r\n";
-        $multipart_message .= 'Content-Transfer-Encoding: 8bit' . "\r\n\r\n";
-        $multipart_message .= $plain_text_message . "\r\n\r\n";
+        $multipart_message .= 'Content-Transfer-Encoding: quoted-printable' . "\r\n\r\n";
+        $multipart_message .= quoted_printable_encode(str_replace("\n", "\r\n", $plain_text_message)) . "\r\n\r\n";
         $multipart_message .= '--' . $this->mass_email_boundary . "\r\n";
         $multipart_message .= 'Content-Type: text/html; charset=UTF-8' . "\r\n";
         $multipart_message .= 'Content-Transfer-Encoding: 8bit' . "\r\n\r\n";
@@ -630,6 +666,10 @@ class listener implements EventSubscriberInterface
      */
     public function notification_message_email($event)
     {
+        // Prevent OOM when phpBB serializes the full queue on save (fopen 'w' truncates first).
+        // A mass email queue can exceed 40 MB serialized; 128 MB web limit is insufficient.
+        @ini_set('memory_limit', '512M');
+
         $this->current_unsubscribe_one_click_url = '';
         $this->current_unsubscribe_type = '';
 
@@ -652,6 +692,11 @@ class listener implements EventSubscriberInterface
             $user_row = $this->find_user_for_recipient($recipient['email'], $recipient['name']);
             if (!$user_row)
             {
+                // Remove placeholders so they don't appear literally in the email body.
+                if ($this->mass_email_context && $this->mass_email_one_click_enabled && isset($event['msg']))
+                {
+                    $event['msg'] = $this->replace_mass_email_one_click_placeholders((string) $event['msg']);
+                }
                 return;
             }
 
@@ -664,6 +709,13 @@ class listener implements EventSubscriberInterface
                     $this->current_unsubscribe_type,
                     (string) ($user_row['user_lang'] ?? '')
                 );
+                if (isset($event['msg']) && $this->current_unsubscribe_one_click_url !== '')
+                {
+                    $event['msg'] = $this->replace_mass_email_one_click_placeholders(
+                        (string) $event['msg'],
+                        $this->current_unsubscribe_one_click_url
+                    );
+                }
                 return;
             }
 
@@ -706,6 +758,7 @@ class listener implements EventSubscriberInterface
 
     /**
      * Throttle queue processing for one-click emails.
+     * 50 ms per email = ~3 min for 3500 recipients, avoids cron lock saturation.
      */
     public function notification_message_process($event)
     {
@@ -717,7 +770,7 @@ class listener implements EventSubscriberInterface
         {
             if (stripos((string) $header, 'X-AdminHelper-OneClick: 1') === 0)
             {
-                usleep(500000);
+                usleep(50000);
                 return;
             }
         }
@@ -1028,6 +1081,63 @@ class listener implements EventSubscriberInterface
         }
 
         return $content . "\n\n" . $footer;
+    }
+
+    /**
+     * Replace one-click placeholders in mass-email bodies, including the quoted-printable text part.
+     */
+    private function replace_mass_email_one_click_placeholders($message, $text_url = '')
+    {
+        $message = str_replace(
+            '##ADMINHELPER_ONE_CLICK_URL_HTML##',
+            $text_url !== '' ? htmlspecialchars($text_url, ENT_QUOTES, 'UTF-8') : '',
+            (string) $message
+        );
+
+        $placeholder = '##ADMINHELPER_ONE_CLICK_URL_TEXT##';
+        $message = str_replace($placeholder, $text_url, $message);
+
+        $boundary = $this->extract_mass_email_boundary_from_body($message);
+        if ($boundary === '')
+        {
+            return $message;
+        }
+
+        $pattern = '/(Content-Type:\s*text\/plain;[^\r\n]*\R'
+            . 'Content-Transfer-Encoding:\s*quoted-printable\R\R)(.*?)(?=\R+--'
+            . preg_quote($boundary, '/')
+            . '(?:\R|--))/is';
+
+        $updated_message = preg_replace_callback(
+            $pattern,
+            function ($matches) use ($placeholder, $text_url) {
+                $decoded_body = quoted_printable_decode($matches[2]);
+                if (strpos($decoded_body, $placeholder) === false)
+                {
+                    return $matches[0];
+                }
+
+                $decoded_body = str_replace(["\r\n", "\r"], "\n", $decoded_body);
+                $decoded_body = str_replace($placeholder, $text_url, $decoded_body);
+                $encoded_body = quoted_printable_encode(str_replace("\n", "\r\n", $decoded_body));
+
+                return $matches[1] . $encoded_body;
+            },
+            $message,
+            1
+        );
+
+        return $updated_message !== null ? $updated_message : $message;
+    }
+
+    private function extract_mass_email_boundary_from_body($message)
+    {
+        if (!preg_match('/\R--([^\r\n]+)\RContent-Type:\s*text\/plain;/i', (string) $message, $matches))
+        {
+            return '';
+        }
+
+        return (string) $matches[1];
     }
 
     private function is_acp_mass_email_submit()
@@ -1423,6 +1533,23 @@ class listener implements EventSubscriberInterface
 
         $this->recipient_user_cache[$cache_key] = $user_row ? $user_row : false;
         return $this->recipient_user_cache[$cache_key];
+    }
+
+    private function parse_memory_limit($val)
+    {
+        $val = trim($val);
+        if ($val === '-1') return -1;
+        $last = strtolower(substr($val, -1));
+        $num  = (int) $val;
+        switch ($last)
+        {
+            case 'g': $num *= 1024;
+            // fall through
+            case 'm': $num *= 1024;
+            // fall through
+            case 'k': $num *= 1024;
+        }
+        return $num;
     }
 
     private function remove_headers_by_name(array $headers, array $prefixes)
@@ -2075,5 +2202,152 @@ class listener implements EventSubscriberInterface
             $url = html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
         return $url;
+    }
+
+    // =========================================================================
+    // Forum gate — contrôle d'accès par nombre de messages
+    // =========================================================================
+
+    /**
+     * Vérifie si l'utilisateur courant satisfait les conditions d'accès du forum.
+     * Déclenché sur viewforum_modify_page_title ET viewtopic_before_f_read_check.
+     * Court-circuit immédiat si le master switch est désactivé.
+     */
+    public function forum_gate_check($event)
+    {
+        // Master switch
+        if (empty($this->config['bastien59960_adminhelper_gate_enabled']))
+        {
+            return;
+        }
+
+        // Admins et fondateurs : jamais bloqués
+        if ($this->auth->acl_get('a_') || (int) $this->user->data['user_type'] === USER_FOUNDER)
+        {
+            return;
+        }
+
+        $forum_id = (int) $event['forum_id'];
+        if ($forum_id <= 0)
+        {
+            return;
+        }
+
+        // Charger les règles (une seule requête par page)
+        $this->gate_load_rules();
+
+        // Résoudre la règle effective pour ce forum
+        $rule = $this->gate_resolve_rule($forum_id);
+
+        $is_anon = ((int) $this->user->data['user_id'] === ANONYMOUS);
+
+        if ($is_anon && $rule['guest_hidden'])
+        {
+            $this->gate_load_language();
+            global $phpbb_root_path, $phpEx;
+            $register_url = append_sid("{$phpbb_root_path}ucp.{$phpEx}", 'mode=register');
+            $login_url    = append_sid("{$phpbb_root_path}ucp.{$phpEx}", 'mode=login');
+            trigger_error(
+                $this->language->lang('FORUM_GATE_GUEST_BLOCKED', $register_url, $login_url),
+                E_USER_NOTICE
+            );
+        }
+        elseif (!$is_anon && (int) $this->user->data['user_posts'] < $rule['min_posts_member'])
+        {
+            $this->gate_load_language();
+            global $phpbb_root_path, $phpEx;
+
+            if ((int) $this->user->data['user_posts'] === 0)
+            {
+                // Aucun message posté → incitation à la présentation
+                $pres_id  = (int) ($this->config['bastien59960_adminhelper_gate_presentation_forum_id'] ?? 14);
+                $pres_url = append_sid("{$phpbb_root_path}viewforum.{$phpEx}", 'f=' . $pres_id);
+                trigger_error(
+                    $this->language->lang('FORUM_GATE_MEMBER_BLOCKED', $rule['min_posts_member'], $pres_url),
+                    E_USER_NOTICE
+                );
+            }
+            else
+            {
+                // A déjà posté mais pas assez → message simple avec le seuil dynamique
+                trigger_error(
+                    $this->language->lang('FORUM_GATE_MEMBER_BLOCKED_GENERIC', $rule['min_posts_member']),
+                    E_USER_NOTICE
+                );
+            }
+        }
+    }
+
+    /**
+     * Charge (une fois par requête) la table forum_gate et la map des parents.
+     */
+    private function gate_load_rules()
+    {
+        if ($this->gate_rules !== null)
+        {
+            return;
+        }
+
+        $this->gate_rules = [];
+        $result = $this->db->sql_query('SELECT forum_id, guest_hidden, min_posts_member FROM ' . $this->gate_table);
+        while ($row = $this->db->sql_fetchrow($result))
+        {
+            $this->gate_rules[(int) $row['forum_id']] = [
+                'guest_hidden'     => (int) $row['guest_hidden'],
+                'min_posts_member' => (int) $row['min_posts_member'],
+            ];
+        }
+        $this->db->sql_freeresult($result);
+
+        $this->gate_forum_map = [];
+        $result = $this->db->sql_query('SELECT forum_id, parent_id FROM ' . $this->forums_table);
+        while ($row = $this->db->sql_fetchrow($result))
+        {
+            $this->gate_forum_map[(int) $row['forum_id']] = (int) $row['parent_id'];
+        }
+        $this->db->sql_freeresult($result);
+    }
+
+    /**
+     * Remonte la chaîne de parents jusqu'à trouver une règle explicite.
+     * Si on atteint la racine sans règle, retourne les défauts globaux.
+     */
+    private function gate_resolve_rule($forum_id, $depth = 0)
+    {
+        // Garde-fou anti-boucle infinie
+        if ($depth > 10)
+        {
+            return $this->gate_default_rule();
+        }
+
+        if (isset($this->gate_rules[$forum_id]))
+        {
+            return $this->gate_rules[$forum_id];
+        }
+
+        $parent_id = $this->gate_forum_map[$forum_id] ?? 0;
+        if ($parent_id <= 0)
+        {
+            return $this->gate_default_rule();
+        }
+
+        return $this->gate_resolve_rule($parent_id, $depth + 1);
+    }
+
+    private function gate_default_rule()
+    {
+        return [
+            'guest_hidden'     => (int) ($this->config['bastien59960_adminhelper_gate_default_guest_hidden'] ?? 0),
+            'min_posts_member' => (int) ($this->config['bastien59960_adminhelper_gate_default_min_posts'] ?? 1),
+        ];
+    }
+
+    private function gate_load_language()
+    {
+        if (!$this->gate_language_loaded)
+        {
+            $this->language->add_lang('info_acp_adminhelper', 'bastien59960/adminhelper');
+            $this->gate_language_loaded = true;
+        }
     }
 }

@@ -16,7 +16,7 @@ DB_USER="forum"
 DB_PASS="cO4Q3b67qf0s1viJfcqr"
 DB_NAME="forum"
 LOG_FILE="/var/log/phpbb_cron_watchdog.log"
-MAX_LOCK_AGE_SECONDS=300  # 5 minutes (au lieu des 3600s phpBB par défaut)
+MAX_LOCK_AGE_SECONDS=600  # 10 min — plus long que geo_async (~250s), plus court que le timeout phpBB (3600s)
 
 MYSQL="mysql -u${DB_USER} -p${DB_PASS} ${DB_NAME} --silent --skip-column-names"
 

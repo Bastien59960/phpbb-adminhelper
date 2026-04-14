@@ -39,6 +39,8 @@ $lang = array_merge($lang, [
     'ADMINHELPER_NOTIFY_UNSUB_PAGE_EXPLAIN' => 'This action disables forum notification emails. It does not delete your forum account.',
     'ADMINHELPER_NOTIFY_UNSUB_PAGE_BUTTON' => 'Confirm unsubscribe',
     'ADMINHELPER_MIME_MULTIPART_NOTICE' => 'This is a multi-part message in MIME format.',
+    'ADMINHELPER_MASS_ONE_CLICK_TEXT' => 'One-click unsubscribe (no login required): %s',
+    'ADMINHELPER_MASS_ONE_CLICK_HTML' => '<p>One-click unsubscribe (no login required): <a href="%1$s">Click here</a></p>',
 
     // Moderation notes
     'ADMINHELPER_MOD_NOTE_BTN'         => 'Add a moderation note',
@@ -90,6 +92,13 @@ $lang = array_merge($lang, [
     'ADMINHELPER_AI_PROVIDER_NOVELAI' => 'NovelAI',
     'ADMINHELPER_AI_PROVIDER_PLAYGROUNDAI' => 'Playground AI',
     'ADMINHELPER_AI_PROVIDER_OPENAI' => 'OpenAI',
+
+    // Forum gate — messages shown to blocked visitors
+    'FORUM_GATE_GUEST_BLOCKED'          => 'This section is for registered members only. <a href="%1$s">Register</a> or <a href="%2$s">log in</a> to access it.',
+    // Used when user_posts == 0: encourages the user to introduce themselves (link to introduction forum)
+    'FORUM_GATE_MEMBER_BLOCKED'         => 'You need at least <strong>%1$d post(s)</strong> to access this section. Start by <a href="%2$s">introducing yourself in the introduction forum</a> — your access will open as soon as your post is validated.',
+    // Used when user_posts >= 1 but < min_posts_member: simple message with the dynamic threshold
+    'FORUM_GATE_MEMBER_BLOCKED_GENERIC' => 'You need at least <strong>%1$d posts</strong> to access this section. Keep participating to unlock access.',
 
     'ACP_ADMINHELPER_ATTACHMENT_AI' => 'AI-generated images',
     'ACP_ADMINHELPER_ATTACHMENT_AI_EXPLAIN' => 'Declaration and bulk scan for AI-generated forum attachments. The scan only auto-locks the public checkbox when it finds strong signatures such as C2PA, known AI tool metadata, or preserved prompt/parameter payloads.',

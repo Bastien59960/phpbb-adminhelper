@@ -10,6 +10,7 @@ Admin Helper groups together several practical phpBB administration and moderati
 - full post body and non-inline attachments on author search
 - internal moderation notes on posts
 - AI-image declaration and automatic source detection on attachments
+- forum access gate: restrict forum/sub-forum visibility by post count
 
 ## Features at a glance
 
@@ -22,6 +23,21 @@ Admin Helper groups together several practical phpBB administration and moderati
 | Full post body on author search | `search.php?author_id=N&sr=posts` |
 | Moderation notes on posts | viewtopic — moderators only |
 | AI-generated image declaration and scan | posting + ACP |
+| Forum gate (post-count access control) | ACP › Extensions › Admin Helper › Forum gate |
+
+## Forum gate
+
+`ACP > Extensions > Admin Helper > Forum gate`
+
+Restrict access to specific forums and sub-forums based on member post count.
+
+- Enable or disable the gate globally with a master switch.
+- Set per-forum rules: minimum post count for members, optional guest hiding.
+- Rules are **inherited from parent forums** — moving a sub-forum in phpBB's hierarchy automatically applies the parent's rule, no manual update needed.
+- Two distinct messages are shown to blocked members:
+  - **0 posts**: invitation to write an introduction post (configurable link to the introduction forum).
+  - **≥ 1 post but below threshold**: plain message showing the exact post count required.
+- Admins and founders are never blocked.
 
 ## AI attachment feature
 
@@ -57,6 +73,7 @@ php bin/phpbbcli.php adminhelper:attachment-ai-scan --batch=1000 --max-seconds=0
 | `adminhelper_unsubscribe_log` | Unsubscribe audit log |
 | `adminhelper_mod_notes` | Internal moderation notes on posts |
 | `adminhelper_attachment_ai` | AI-image state for attachments, scan status, detected source |
+| `adminhelper_forum_gate` | Per-forum access rules (post count, guest hiding) |
 
 ## Requirements
 
@@ -92,8 +109,7 @@ php bin/phpbbcli.php extension:purge bastien59960/adminhelper
 
 ## Language coverage
 
-- Full current coverage: `fr`, `en`
-- Legacy files also exist for `de`, `es`, `it`, but the newest AI-attachment strings are not yet fully translated there.
+Full coverage: `fr`, `en`, `de`, `es`, `it`
 
 ## Author
 

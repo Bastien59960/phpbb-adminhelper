@@ -155,10 +155,8 @@
             <th>{L_ACP_ADMINHELPER_LOG_COL_STATUS}</th>
             <th>{L_ACP_ADMINHELPER_LOG_COL_USER}</th>
             <th>{L_ACP_ADMINHELPER_LOG_COL_EMAIL}</th>
-            <th>{L_ACP_ADMINHELPER_LOG_COL_HTTP}</th>
             <th>{L_ACP_ADMINHELPER_LOG_COL_METHOD}</th>
             <th>{L_ACP_ADMINHELPER_LOG_COL_IP}</th>
-            <th>{L_ACP_ADMINHELPER_LOG_COL_TOKEN_EXP}</th>
             <th>{L_ACP_ADMINHELPER_LOG_COL_UA}</th>
             <th>{L_ACP_ADMINHELPER_LOG_COL_ACTIONS}</th>
         </tr>
@@ -178,12 +176,11 @@
                     {% else %}
                         {{ log.USER_LABEL|e }}
                     {% endif %}
+                    {% if log.USER_ID_LABEL %}<br><small style="color:#999;">{{ log.USER_ID_LABEL|e }}</small>{% endif %}
                 </td>
                 <td><code>{{ log.USER_EMAIL|e }}</code></td>
-                <td>{{ log.HTTP_STATUS|e }}</td>
                 <td>{{ log.REQUEST_METHOD|e }}</td>
                 <td><code>{{ log.REQUEST_IP|e }}</code></td>
-                <td>{{ log.TOKEN_EXPIRES_AT|e }}</td>
                 <td title="{{ log.USER_AGENT|e('html_attr') }}">{{ log.USER_AGENT_SHORT|e }}</td>
                 <td>
                     {% if log.CAN_RESTORE_NOTIFY %}
@@ -195,7 +192,7 @@
             </tr>
         {% else %}
             <tr class="row1">
-                <td colspan="12">{L_ACP_ADMINHELPER_LOG_NO_ROWS}</td>
+                <td colspan="10">{L_ACP_ADMINHELPER_LOG_NO_ROWS}</td>
             </tr>
         {% endfor %}
     </tbody>
