@@ -75,6 +75,14 @@ php bin/phpbbcli.php adminhelper:attachment-ai-scan --batch=1000 --max-seconds=0
 | `adminhelper_attachment_ai` | AI-image state for attachments, scan status, detected source |
 | `adminhelper_forum_gate` | Per-forum access rules (post count, guest hiding) |
 
+## Inter-extension dependencies
+
+| Dependency | Role | Type |
+|---|---|---|
+| `bastien59960/reactions` | ACP reads `phpbb3_post_reactions` for notification statistics and email maintenance actions | **Optional** — the reactions section in ACP is auto-hidden via `sql_table_exists()` if reactions is absent |
+
+`adminhelper` has **no hard dependency** on any other extension. All cross-extension integrations degrade gracefully.
+
 ## Requirements
 
 - PHP `>= 7.1.3`

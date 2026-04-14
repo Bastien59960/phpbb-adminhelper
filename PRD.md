@@ -368,3 +368,19 @@ ACP → Admin Helper → **Contrôle d'accès forums** → cocher "Activer le co
 - Pas de dépendance à une API externe.
 - Pas de confiance dans un simple indice faible comme la seule présence du mot `c2pa`.
 - Les chaînes AI les plus récentes sont documentées et maintenues en priorité en `fr` et `en`.
+
+## Dépendances inter-extensions
+
+### Utilise (optionnelles)
+
+| Extension | Accès | Point de contrôle | Comportement sans |
+|---|---|---|---|
+| `bastien59960/reactions` | Lit `phpbb3_post_reactions` : colonnes `reaction_notified`, `reaction_email_sent`, `reaction_time` | `$db_tools->sql_table_exists()` avant chaque requête | Section "Réactions email" masquée dans l'ACP ; restauration des abonnements `reactions_notify` désactivée |
+
+### Exposée à (consommateurs)
+
+Aucun autre module du projet ne dépend directement de tables ou de services d'adminhelper.
+
+### Résumé
+
+`adminhelper` n'a aucune dépendance forte sur d'autres extensions. Toutes les intégrations inter-extensions utilisent des vérifications d'existence (`sql_table_exists`, `sql_column_exists`) et se dégradent silencieusement.
