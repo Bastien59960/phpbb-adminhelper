@@ -127,4 +127,21 @@ $lang = array_merge($lang, [
     'ACP_ADMINHELPER_ATTACHMENT_AI_REASON_C2PA_GOOGLE_GENERATIVE_AI' => 'Manifeste C2PA Google Generative AI',
     'ACP_ADMINHELPER_ATTACHMENT_AI_REASON_METADATA_AI_TOOL' => 'Metadonnees d\'un generateur IA connu',
     'ACP_ADMINHELPER_ATTACHMENT_AI_REASON_METADATA_PROMPT_SIGNATURE' => 'Prompt/parametres IA conserves dans le fichier',
+
+    // Server metrics (footer index, visible admins/moderateurs uniquement)
+    'ADMINHELPER_METRICS_PREFIX'   => 'Charge serveur',
+    'ADMINHELPER_METRICS_HINT'     => 'Metriques systeme rafraichies toutes les 10 s, visibles uniquement par les administrateurs et moderateurs.',
+    'ADMINHELPER_METRICS_LOAD'     => 'Load 1/5/15 min',
+    'ADMINHELPER_METRICS_CPU'      => 'CPU',
+    'ADMINHELPER_METRICS_WORKERS'  => 'Workers Apache',
+    'ADMINHELPER_METRICS_SESSIONS' => 'Sessions actives (5 min)',
+    'ADMINHELPER_METRICS_USERS'    => 'membres',
+    'ADMINHELPER_METRICS_GUESTS'   => 'invites',
+    'ADMINHELPER_METRICS_BOTS'     => 'bots',
+    'ADMINHELPER_METRICS_REQRATE'  => 'Trafic',
+    'ADMINHELPER_METRICS_REQ_SEC'  => 'req/s',
+    'ADMINHELPER_METRICS_MEMORY'   => 'RAM',
+    'ADMINHELPER_METRICS_MIB'      => 'Mio',
+    'ADMINHELPER_METRICS_MYSQL'    => 'MySQL',
+    'ADMINHELPER_METRICS_UPTIME'   => 'Uptime Apache',
 ]);

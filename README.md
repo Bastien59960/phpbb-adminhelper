@@ -11,6 +11,7 @@ Admin Helper groups together several practical phpBB administration and moderati
 - internal moderation notes on posts
 - AI-image declaration and automatic source detection on attachments
 - forum access gate: restrict forum/sub-forum visibility by post count
+- live server load overview at the bottom of the board index (admins and moderators only)
 
 ## Features at a glance
 
@@ -24,6 +25,29 @@ Admin Helper groups together several practical phpBB administration and moderati
 | Moderation notes on posts | viewtopic — moderators only |
 | AI-generated image declaration and scan | posting + ACP |
 | Forum gate (post-count access control) | ACP › Extensions › Admin Helper › Forum gate |
+| Server load overview | Board index — below the Statistics block |
+
+## Server load overview
+
+Adds a one-line server health bar right under the *Statistics* block on the board
+index, refreshed every 10 seconds. Visible only to administrators and moderators.
+
+Metrics displayed:
+
+- **Load 1/5/15 min** — Linux system load average (`sys_getloadavg`), with CPU count.
+- **Apache workers** — busy / total prefork workers (read from `mod_status`).
+- **Active sessions (5 min)** — logged-in members, human guests and bots (from `phpbb3_sessions`).
+- **Traffic** — requests per second reported by Apache.
+- **RAM** — used / total in MiB (from `/proc/meminfo`).
+- **MySQL** — open connections (`Threads_connected`).
+- **Apache uptime** — time since the last Apache restart.
+
+The block turns orange when load exceeds 0.7 per CPU or workers go above 60 %
+utilization, and red beyond 1.5 per CPU or 85 % workers — handy to spot bot/scraper
+saturation at a glance.
+
+Server prerequisite: Apache `mod_status` enabled with `Require local` in
+`/etc/apache2/mods-enabled/status.conf` (default on Debian/Ubuntu).
 
 ## Forum gate
 

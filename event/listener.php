@@ -104,6 +104,7 @@ class listener implements EventSubscriberInterface
             'core.submit_post_before'                          => 'normalize_post_urls',
             'core.viewforum_modify_page_title'                 => 'forum_gate_check',
             'core.viewtopic_before_f_read_check'               => 'forum_gate_check',
+            'core.index_modify_page_title'                     => 'inject_server_metrics',
         ];
     }
 
@@ -2349,5 +2350,267 @@ class listener implements EventSubscriberInterface
             $this->language->add_lang('info_acp_adminhelper', 'bastien59960/adminhelper');
             $this->gate_language_loaded = true;
         }
+    }
+
+    /**
+     * core.index_modify_page_title — affiche les métriques serveur (load, workers Apache,
+     * sessions, mémoire) dans le bloc Statistiques de l'index, visible uniquement pour
+     * les administrateurs et les modérateurs.
+     *
+     * Les valeurs sont mises en cache 10 secondes dans cache/production/ pour éviter de
+     * solliciter mod_status à chaque chargement quand plusieurs admins/mods sont en ligne.
+     */
+    public function inject_server_metrics($event)
+    {
+        if (!$this->auth->acl_get('a_') && !$this->auth->acl_getf_global('m_'))
+        {
+            return;
+        }
+
+        $this->load_language();
+
+        $metrics = $this->collect_server_metrics();
+        if ($metrics === null)
+        {
+            return;
+        }
+
+        $this->template->assign_vars([
+            'ADMINHELPER_METRICS_DISPLAY'   => true,
+            'ADMINHELPER_METRICS_LEVEL'     => $metrics['level'],
+            'ADMINHELPER_METRICS_LOAD1'     => $metrics['load1'],
+            'ADMINHELPER_METRICS_LOAD5'     => $metrics['load5'],
+            'ADMINHELPER_METRICS_LOAD15'    => $metrics['load15'],
+            'ADMINHELPER_METRICS_CPU_COUNT' => $metrics['cpu_count'],
+            'ADMINHELPER_METRICS_WORKERS_BUSY'  => $metrics['workers_busy'],
+            'ADMINHELPER_METRICS_WORKERS_MAX'   => $metrics['workers_max'],
+            'ADMINHELPER_METRICS_WORKERS_PCT'   => $metrics['workers_pct'],
+            'ADMINHELPER_METRICS_SESSIONS_USERS'  => $metrics['sessions_users'],
+            'ADMINHELPER_METRICS_SESSIONS_GUESTS' => $metrics['sessions_guests'],
+            'ADMINHELPER_METRICS_SESSIONS_BOTS'   => $metrics['sessions_bots'],
+            'ADMINHELPER_METRICS_REQ_PER_SEC'   => $metrics['req_per_sec'],
+            'ADMINHELPER_METRICS_MEM_USED_MB'   => $metrics['mem_used_mb'],
+            'ADMINHELPER_METRICS_MEM_TOTAL_MB'  => $metrics['mem_total_mb'],
+            'ADMINHELPER_METRICS_MEM_PCT'       => $metrics['mem_pct'],
+            'ADMINHELPER_METRICS_MYSQL_THREADS' => $metrics['mysql_threads'],
+            'ADMINHELPER_METRICS_UPTIME'        => $metrics['uptime'],
+        ]);
+    }
+
+    /**
+     * Collecte les métriques système. Met en cache 10s dans cache/production/.
+     * Retourne null en cas d'échec catastrophique (extension désactivable sans risque).
+     */
+    private function collect_server_metrics()
+    {
+        $cache_file = (defined('PHPBB_ROOT_PATH') ? PHPBB_ROOT_PATH : '/var/www/forum/') . 'cache/production/adminhelper_metrics.php';
+        $cache_ttl  = 10;
+
+        if (@is_file($cache_file) && (time() - @filemtime($cache_file)) < $cache_ttl)
+        {
+            $cached = @include $cache_file;
+            if (is_array($cached))
+            {
+                return $cached;
+            }
+        }
+
+        $metrics = [
+            'load1' => '-', 'load5' => '-', 'load15' => '-', 'cpu_count' => 1,
+            'workers_busy' => 0, 'workers_max' => 0, 'workers_pct' => 0,
+            'sessions_users' => 0, 'sessions_guests' => 0, 'sessions_bots' => 0,
+            'req_per_sec' => '0', 'mem_used_mb' => 0, 'mem_total_mb' => 0, 'mem_pct' => 0,
+            'mysql_threads' => 0, 'uptime' => '-', 'level' => 'ok',
+        ];
+
+        // 1) Load average (PHP natif, lit /proc/loadavg)
+        if (function_exists('sys_getloadavg'))
+        {
+            $load = sys_getloadavg();
+            if (is_array($load) && count($load) >= 3)
+            {
+                $metrics['load1']  = number_format((float) $load[0], 2, '.', '');
+                $metrics['load5']  = number_format((float) $load[1], 2, '.', '');
+                $metrics['load15'] = number_format((float) $load[2], 2, '.', '');
+            }
+        }
+        $metrics['cpu_count'] = $this->count_cpu_cores();
+
+        // 2) Apache mod_status
+        $status = $this->fetch_mod_status();
+        if ($status !== null)
+        {
+            $busy = (int) ($status['BusyWorkers'] ?? 0);
+            $idle = (int) ($status['IdleWorkers'] ?? 0);
+            $scoreboard = (string) ($status['Scoreboard'] ?? '');
+            $max  = strlen($scoreboard) > 0 ? strlen($scoreboard) : ($busy + $idle);
+
+            $metrics['workers_busy'] = $busy;
+            $metrics['workers_max']  = $max;
+            $metrics['workers_pct']  = ($max > 0) ? (int) round(($busy / $max) * 100) : 0;
+            $metrics['req_per_sec']  = isset($status['ReqPerSec']) ? number_format((float) $status['ReqPerSec'], 1, '.', '') : '0';
+            $metrics['uptime']       = $this->format_uptime((int) ($status['ServerUptimeSeconds'] ?? 0));
+        }
+
+        // 3) Sessions phpBB (5 dernières minutes)
+        $window = time() - 300;
+        $sessions_table = (defined('SESSIONS_TABLE') ? SESSIONS_TABLE : 'phpbb3_sessions');
+        $sql = 'SELECT
+                    SUM(CASE WHEN session_user_id = ' . ANONYMOUS . ' AND session_browser NOT LIKE \'%bot%\' THEN 1 ELSE 0 END) AS guests,
+                    SUM(CASE WHEN session_user_id = ' . ANONYMOUS . ' AND session_browser LIKE \'%bot%\' THEN 1 ELSE 0 END) AS bots,
+                    COUNT(DISTINCT CASE WHEN session_user_id <> ' . ANONYMOUS . ' THEN session_user_id END) AS users
+                FROM ' . $sessions_table . '
+                WHERE session_time >= ' . (int) $window;
+        $result = $this->db->sql_query($sql);
+        $row = $this->db->sql_fetchrow($result);
+        $this->db->sql_freeresult($result);
+        if ($row)
+        {
+            $metrics['sessions_users']  = (int) $row['users'];
+            $metrics['sessions_guests'] = (int) $row['guests'];
+            $metrics['sessions_bots']   = (int) $row['bots'];
+        }
+
+        // 4) Mémoire (parse /proc/meminfo)
+        $mem = $this->read_meminfo();
+        if ($mem !== null)
+        {
+            $metrics['mem_total_mb'] = (int) round($mem['total'] / 1024);
+            $metrics['mem_used_mb']  = (int) round(($mem['total'] - $mem['available']) / 1024);
+            $metrics['mem_pct']      = ($mem['total'] > 0) ? (int) round((($mem['total'] - $mem['available']) / $mem['total']) * 100) : 0;
+        }
+
+        // 5) MySQL Threads_connected
+        $result = $this->db->sql_query('SHOW STATUS LIKE \'Threads_connected\'');
+        $row = $this->db->sql_fetchrow($result);
+        $this->db->sql_freeresult($result);
+        if ($row && isset($row['Value']))
+        {
+            $metrics['mysql_threads'] = (int) $row['Value'];
+        }
+
+        // 6) Niveau d'alerte global (vert/orange/rouge)
+        $metrics['level'] = $this->compute_metrics_level($metrics);
+
+        // 7) Cache
+        $payload = '<?php return ' . var_export($metrics, true) . ';' . "\n";
+        @file_put_contents($cache_file, $payload, LOCK_EX);
+
+        return $metrics;
+    }
+
+    /**
+     * Récupère l'état Apache via mod_status (?auto, format machine-friendly).
+     * Timeout strict 300 ms pour ne pas bloquer le rendu si Apache sature.
+     */
+    private function fetch_mod_status()
+    {
+        $url = 'http://127.0.0.1/server-status?auto';
+        $ctx = stream_context_create([
+            'http' => [
+                'method'  => 'GET',
+                'timeout' => 0.3,
+                'header'  => "User-Agent: phpbb-adminhelper-metrics\r\n",
+                'ignore_errors' => true,
+            ],
+        ]);
+        $body = @file_get_contents($url, false, $ctx);
+        if ($body === false || $body === '')
+        {
+            return null;
+        }
+        $out = [];
+        foreach (explode("\n", $body) as $line)
+        {
+            if (strpos($line, ':') === false)
+            {
+                continue;
+            }
+            list($k, $v) = explode(':', $line, 2);
+            $out[trim($k)] = trim($v);
+        }
+        return $out ?: null;
+    }
+
+    private function read_meminfo()
+    {
+        if (!@is_readable('/proc/meminfo'))
+        {
+            return null;
+        }
+        $info = ['total' => 0, 'available' => 0];
+        $fh = @fopen('/proc/meminfo', 'r');
+        if (!$fh)
+        {
+            return null;
+        }
+        while (($line = fgets($fh)) !== false)
+        {
+            if (preg_match('/^MemTotal:\s+(\d+) kB/', $line, $m))
+            {
+                $info['total'] = (int) $m[1];
+            }
+            elseif (preg_match('/^MemAvailable:\s+(\d+) kB/', $line, $m))
+            {
+                $info['available'] = (int) $m[1];
+            }
+        }
+        fclose($fh);
+        return ($info['total'] > 0) ? $info : null;
+    }
+
+    private function count_cpu_cores()
+    {
+        if (@is_readable('/proc/cpuinfo'))
+        {
+            $content = @file_get_contents('/proc/cpuinfo');
+            $count = substr_count((string) $content, "\nprocessor");
+            if ($count > 0)
+            {
+                return $count;
+            }
+        }
+        return 1;
+    }
+
+    private function format_uptime($seconds)
+    {
+        $seconds = (int) $seconds;
+        if ($seconds <= 0)
+        {
+            return '-';
+        }
+        $days  = (int) ($seconds / 86400);
+        $hours = (int) (($seconds % 86400) / 3600);
+        if ($days > 0)
+        {
+            return $days . 'j ' . $hours . 'h';
+        }
+        $minutes = (int) (($seconds % 3600) / 60);
+        return $hours . 'h ' . $minutes . 'm';
+    }
+
+    /**
+     * Calcule le niveau global d'alerte selon load/CPU et saturation workers.
+     * - ok    : load1/CPU < 0.7 ET workers < 60%
+     * - warn  : load1/CPU < 1.5 ET workers < 85%
+     * - crit  : sinon
+     */
+    private function compute_metrics_level(array $m)
+    {
+        $cpu  = max(1, (int) $m['cpu_count']);
+        $load = is_numeric($m['load1']) ? (float) $m['load1'] : 0.0;
+        $ratio = $load / $cpu;
+        $wpct  = (int) $m['workers_pct'];
+
+        if ($ratio >= 1.5 || $wpct >= 85)
+        {
+            return 'crit';
+        }
+        if ($ratio >= 0.7 || $wpct >= 60)
+        {
+            return 'warn';
+        }
+        return 'ok';
     }
 }

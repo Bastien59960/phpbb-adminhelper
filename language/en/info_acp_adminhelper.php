@@ -127,4 +127,21 @@ $lang = array_merge($lang, [
     'ACP_ADMINHELPER_ATTACHMENT_AI_REASON_C2PA_GOOGLE_GENERATIVE_AI' => 'Google Generative AI C2PA manifest',
     'ACP_ADMINHELPER_ATTACHMENT_AI_REASON_METADATA_AI_TOOL' => 'Known AI generator metadata',
     'ACP_ADMINHELPER_ATTACHMENT_AI_REASON_METADATA_PROMPT_SIGNATURE' => 'Preserved AI prompt/parameter signature',
+
+    // Server metrics (index footer, admins/moderators only)
+    'ADMINHELPER_METRICS_PREFIX'   => 'Server load',
+    'ADMINHELPER_METRICS_HINT'     => 'System metrics refreshed every 10 s, visible to administrators and moderators only.',
+    'ADMINHELPER_METRICS_LOAD'     => 'Load 1/5/15 min',
+    'ADMINHELPER_METRICS_CPU'      => 'CPU',
+    'ADMINHELPER_METRICS_WORKERS'  => 'Apache workers',
+    'ADMINHELPER_METRICS_SESSIONS' => 'Active sessions (5 min)',
+    'ADMINHELPER_METRICS_USERS'    => 'users',
+    'ADMINHELPER_METRICS_GUESTS'   => 'guests',
+    'ADMINHELPER_METRICS_BOTS'     => 'bots',
+    'ADMINHELPER_METRICS_REQRATE'  => 'Traffic',
+    'ADMINHELPER_METRICS_REQ_SEC'  => 'req/s',
+    'ADMINHELPER_METRICS_MEMORY'   => 'RAM',
+    'ADMINHELPER_METRICS_MIB'      => 'MiB',
+    'ADMINHELPER_METRICS_MYSQL'    => 'MySQL',
+    'ADMINHELPER_METRICS_UPTIME'   => 'Apache uptime',
 ]);

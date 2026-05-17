@@ -11,6 +11,7 @@ Admin Helper regroupe plusieurs outils pratiques d'administration et de modérat
 - notes de modération internes sur les posts
 - déclaration et détection automatique des images générées par IA sur les pièces jointes
 - portail d'accès aux forums : restreindre la visibilité d'un forum/sous-forum selon le nombre de messages
+- aperçu de la charge serveur en pied de page d'accueil (admins et modérateurs uniquement)
 
 ## Fonctionnalités en un coup d'œil
 
@@ -24,6 +25,30 @@ Admin Helper regroupe plusieurs outils pratiques d'administration et de modérat
 | Notes de modération sur les posts | viewtopic — modérateurs uniquement |
 | Images générées par IA | publication + ACP |
 | Portail d'accès (contrôle par nombre de messages) | ACP › Extensions › Admin Helper › Forum gate |
+| Aperçu de la charge serveur | Page d'accueil — sous le bloc Statistiques |
+
+## Aperçu de la charge serveur
+
+Affiche, juste sous le bloc *Statistiques* en bas de la page d'accueil, une barre
+de métriques système rafraîchie toutes les 10 secondes. Visible uniquement par les
+administrateurs et les modérateurs.
+
+Métriques affichées :
+
+- **Load 1/5/15 min** : moyenne de charge système Linux (`sys_getloadavg`), avec le nombre de CPU.
+- **Workers Apache** : nombre de workers prefork occupés sur le total alloué (lecture de `mod_status`).
+- **Sessions actives (5 min)** : membres connectés, invités humains et bots (basé sur `phpbb3_sessions`).
+- **Trafic** : requêtes par seconde mesurées par Apache.
+- **RAM** : utilisée / totale (lecture de `/proc/meminfo`).
+- **MySQL** : connexions ouvertes (`Threads_connected`).
+- **Uptime Apache** : temps écoulé depuis le dernier redémarrage.
+
+Le bloc passe en orange si la charge dépasse 0.7/CPU ou si les workers sont à plus
+de 60 % d'occupation, et en rouge au-delà de 1.5/CPU ou 85 % de workers — utile
+pour repérer en un coup d'œil une saturation due aux bots / scrapers.
+
+Pré-requis serveur : module Apache `mod_status` activé avec `Require local` dans
+`/etc/apache2/mods-enabled/status.conf` (configuration par défaut Debian/Ubuntu).
 
 ## Portail d'accès aux forums (Forum gate)
 

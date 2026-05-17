@@ -1,6 +1,6 @@
 # PRD — bastien59960/adminhelper
 
-**Dernière mise à jour :** 2026-04-13
+**Dernière mise à jour :** 2026-05-17
 **Extension :** `ext/bastien59960/adminhelper`  
 **Version courante :** 1.0.6
 
@@ -13,6 +13,7 @@ Fournir une extension d'administration phpBB polyvalente qui centralise plusieur
 - améliorer la recherche par auteur
 - donner aux modérateurs des outils internes sur les posts
 - déclarer et détecter les images générées par IA sur les pièces jointes
+- donner aux admins/modérateurs une visibilité en temps réel sur la charge serveur
 
 ## Fonctionnalités livrées
 
@@ -92,6 +93,51 @@ Sources actuellement observées et validées sur le forum :
 - module ACP de suivi et scan batch
 - commande CLI `adminhelper:attachment-ai-scan`
 
+### 8. Métriques serveur dans le pied de l'index
+
+#### Objectif fonctionnel
+
+Donner aux administrateurs et modérateurs un aperçu immédiat de la charge serveur
+sur la page d'accueil du forum, juste sous le bloc *Statistiques*, pour repérer
+rapidement la saturation due aux bots et scrapers.
+
+#### Règles produit
+
+- Bloc visible uniquement si `auth.acl_get('a_')` ou `auth.acl_getf_global('m_')` retourne vrai.
+- Aucune information sensible (chemins, mots de passe, IPs) n'est exposée — uniquement des compteurs agrégés.
+- Le calcul ne doit pas bloquer le rendu : timeout strict de 300 ms sur `mod_status`, cache 10 s dans `cache/production/adminhelper_metrics.php`.
+- L'extension reste fonctionnelle si `mod_status`, `/proc/meminfo` ou `/proc/cpuinfo` sont indisponibles (champs affichés à `-` ou 0).
+
+#### Métriques affichées
+
+| Champ | Source | Sens |
+|---|---|---|
+| Load 1/5/15 min + nb CPU | `sys_getloadavg()` + `/proc/cpuinfo` | Charge système ; ratio load/CPU = niveau d'alerte |
+| Workers Apache busy/max | `mod_status?auto` (`BusyWorkers`, `Scoreboard`) | Saturation Apache prefork (par défaut 250 workers) |
+| Sessions actives (5 min) | `phpbb3_sessions` filtré sur `session_time` | Décomposé en membres / invités / bots (`session_browser LIKE %bot%`) |
+| Trafic | `mod_status?auto` (`ReqPerSec`) | Requêtes HTTP par seconde |
+| RAM | `/proc/meminfo` (`MemTotal`, `MemAvailable`) | Utilisée / totale en Mio |
+| MySQL | `SHOW STATUS LIKE 'Threads_connected'` | Connexions MySQL ouvertes |
+| Uptime Apache | `mod_status?auto` (`ServerUptimeSeconds`) | Temps depuis le dernier redémarrage Apache |
+
+#### Niveau d'alerte global
+
+Couleur du bloc calculée par `compute_metrics_level()` :
+
+| Niveau | Couleur | Condition |
+|---|---|---|
+| ok | vert | `load1/CPU < 0.7` ET workers `< 60 %` |
+| warn | orange | `load1/CPU < 1.5` ET workers `< 85 %` |
+| crit | rouge | sinon |
+
+#### Hook et fichiers
+
+- Event PHP : `core.index_modify_page_title` → `inject_server_metrics()`
+- Event template : `index_body_block_stats_append` (s'insère après `NEWEST_USER` dans `index_body.html`)
+- Fichier template : `styles/all/template/event/index_body_block_stats_append.html`
+- Cache : `cache/production/adminhelper_metrics.php` (TTL 10 s)
+- Pré-requis serveur : `mod_status` Apache activé en `Require local`, accessible depuis le PHP via `http://127.0.0.1/server-status?auto`.
+
 ## Schéma de données
 
 | Table | Rôle |
@@ -141,6 +187,7 @@ migrations/release_1_0_5.php
 styles/all/template/event/posting_attach_body_file_list_after.html
 styles/all/template/adminhelper_ai_posting.js
 styles/all/template/event/attachment_file_append.html
+styles/all/template/event/index_body_block_stats_append.html
 ```
 
 ## Correctifs

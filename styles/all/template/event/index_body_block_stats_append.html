@@ -1,0 +1,54 @@
+<!-- IF ADMINHELPER_METRICS_DISPLAY -->
+<br>
+<span class="adminhelper-server-metrics adminhelper-metrics-{ADMINHELPER_METRICS_LEVEL}" title="{L_ADMINHELPER_METRICS_HINT}">
+	<strong>{L_ADMINHELPER_METRICS_PREFIX}</strong>
+	<span class="adminhelper-metric">
+		<strong>{L_ADMINHELPER_METRICS_LOAD}{L_COLON}</strong>
+		{ADMINHELPER_METRICS_LOAD1} / {ADMINHELPER_METRICS_LOAD5} / {ADMINHELPER_METRICS_LOAD15}
+		<span class="adminhelper-cpu">({ADMINHELPER_METRICS_CPU_COUNT}&nbsp;{L_ADMINHELPER_METRICS_CPU})</span>
+	</span>
+	&bull;
+	<span class="adminhelper-metric">
+		<strong>{L_ADMINHELPER_METRICS_WORKERS}{L_COLON}</strong>
+		{ADMINHELPER_METRICS_WORKERS_BUSY} / {ADMINHELPER_METRICS_WORKERS_MAX}
+		<span class="adminhelper-cpu">({ADMINHELPER_METRICS_WORKERS_PCT}%)</span>
+	</span>
+	&bull;
+	<span class="adminhelper-metric">
+		<strong>{L_ADMINHELPER_METRICS_SESSIONS}{L_COLON}</strong>
+		{ADMINHELPER_METRICS_SESSIONS_USERS}&nbsp;{L_ADMINHELPER_METRICS_USERS} +
+		{ADMINHELPER_METRICS_SESSIONS_GUESTS}&nbsp;{L_ADMINHELPER_METRICS_GUESTS} +
+		{ADMINHELPER_METRICS_SESSIONS_BOTS}&nbsp;{L_ADMINHELPER_METRICS_BOTS}
+	</span>
+	&bull;
+	<span class="adminhelper-metric">
+		<strong>{L_ADMINHELPER_METRICS_REQRATE}{L_COLON}</strong>
+		{ADMINHELPER_METRICS_REQ_PER_SEC}&nbsp;{L_ADMINHELPER_METRICS_REQ_SEC}
+	</span>
+	&bull;
+	<span class="adminhelper-metric">
+		<strong>{L_ADMINHELPER_METRICS_MEMORY}{L_COLON}</strong>
+		{ADMINHELPER_METRICS_MEM_USED_MB}&nbsp;/&nbsp;{ADMINHELPER_METRICS_MEM_TOTAL_MB}&nbsp;{L_ADMINHELPER_METRICS_MIB}
+		<span class="adminhelper-cpu">({ADMINHELPER_METRICS_MEM_PCT}%)</span>
+	</span>
+	&bull;
+	<span class="adminhelper-metric">
+		<strong>{L_ADMINHELPER_METRICS_MYSQL}{L_COLON}</strong>
+		{ADMINHELPER_METRICS_MYSQL_THREADS}
+	</span>
+	&bull;
+	<span class="adminhelper-metric">
+		<strong>{L_ADMINHELPER_METRICS_UPTIME}{L_COLON}</strong>
+		{ADMINHELPER_METRICS_UPTIME}
+	</span>
+</span>
+<style>
+.adminhelper-server-metrics{display:inline-block;margin-top:6px;padding:4px 8px;border-radius:4px;font-size:0.85em;line-height:1.5;border-left:3px solid #888;}
+.adminhelper-server-metrics .adminhelper-metric{white-space:nowrap;}
+.adminhelper-server-metrics .adminhelper-cpu{color:#666;font-size:0.9em;}
+.adminhelper-metrics-ok{background:#e8f5e9;border-left-color:#43a047;color:#1b5e20;}
+.adminhelper-metrics-warn{background:#fff8e1;border-left-color:#f9a825;color:#7c5c00;}
+.adminhelper-metrics-crit{background:#ffebee;border-left-color:#e53935;color:#7f1d1d;}
+.adminhelper-metrics-crit .adminhelper-cpu,.adminhelper-metrics-warn .adminhelper-cpu{color:inherit;opacity:0.75;}
+</style>
+<!-- ENDIF -->
